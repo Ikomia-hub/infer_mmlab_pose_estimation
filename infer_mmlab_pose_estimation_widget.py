@@ -86,7 +86,7 @@ class InferMmlabPoseEstimationWidget(core.CWorkflowTaskWidget):
         layout_ptr = qtconversion.PyQtToQt(self.gridLayout)
 
         # Set widget layout
-        self.setLayout(layout_ptr)
+        self.set_layout(layout_ptr)
 
     def on_body_part_changed(self, s):
         supported_tasks = ["2d_kpt_sview_rgb_img"]
@@ -217,7 +217,7 @@ class InferMmlabPoseEstimationWidget(core.CWorkflowTaskWidget):
                 else:
                     self.combo_detector.setCurrentText('None')
 
-    def onApply(self):
+    def on_apply(self):
         # Apply button clicked slot
 
         # Get parameters from widget
@@ -236,7 +236,7 @@ class InferMmlabPoseEstimationWidget(core.CWorkflowTaskWidget):
         self.parameters.cfg_pose = self.cfg
         self.parameters.detector = self.combo_detector.currentText()
         # Send signal to launch the process
-        self.emitApply(self.parameters)
+        self.emit_apply(self.parameters)
 
 
 # --------------------
