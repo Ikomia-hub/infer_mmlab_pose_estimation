@@ -49,10 +49,10 @@ class InferMmlabPoseEstimationParam(core.CWorkflowTaskParam):
         self.dataset = "coco"
         self.model_name = "vipnas_coco"
         self.config_name = "topdown_heatmap_vipnas_res50_coco_256x192"
-        self.det_thr = 0.5
-        self.kp_thr = 0.3
-        self.cfg_pose = "body/2d_kpt_sview_rgb_img/topdown_heatmap/coco/vipnas_res50_coco_256x192.py"
-        self.ckpt_pose = "https://download.openmmlab.com/mmpose/top_down/vipnas/vipnas_res50_coco_256x192-cc43b466_20210624.pth"
+        self.conf_thres = 0.5
+        self.conf_kp_thres = 0.3
+        self.config = "body/2d_kpt_sview_rgb_img/topdown_heatmap/coco/vipnas_res50_coco_256x192.py"
+        self.model_url = "https://download.openmmlab.com/mmpose/top_down/vipnas/vipnas_res50_coco_256x192-cc43b466_20210624.pth"
         self.detector = "coco"
 
     def set_values(self, param_map):
@@ -66,10 +66,10 @@ class InferMmlabPoseEstimationParam(core.CWorkflowTaskParam):
         self.dataset = param_map["dataset"]
         self.model_name = param_map["model_name"]
         self.config_name = param_map["config_name"]
-        self.det_thr = float(param_map["det_thr"])
-        self.kp_thr = float(param_map["kp_thr"])
-        self.ckpt_pose = param_map["ckpt_pose"]
-        self.cfg_pose = param_map["cfg_pose"]
+        self.conf_thres = float(param_map["conf_thres"])
+        self.conf_kp_thres = float(param_map["conf_kp_thres"])
+        self.model_url = param_map["model_url"]
+        self.config = param_map["config"]
         self.detector = param_map["detector"]
 
     def get_values(self):
@@ -84,10 +84,10 @@ class InferMmlabPoseEstimationParam(core.CWorkflowTaskParam):
         param_map["method"] = self.method
         param_map["dataset"] = self.dataset
         param_map["config_name"] = self.config_name
-        param_map["det_thr"] = str(self.det_thr)
-        param_map["kp_thr"] = str(self.kp_thr)
-        param_map["ckpt_pose"] = self.ckpt_pose
-        param_map["cfg_pose"] = self.cfg_pose
+        param_map["conf_thres"] = str(self.conf_thres)
+        param_map["conf_kp_thres"] = str(self.conf_kp_thres)
+        param_map["model_url"] = self.model_url
+        param_map["config"] = self.config
         param_map["detector"] = self.detector
         return param_map
 
@@ -170,8 +170,8 @@ class InferMmlabPoseEstimation(dataprocess.CKeypointDetectionTask):
 
         if (self.pose_model is None or param.update) and are_params_valid(param):
             cfg_dir = os.path.join(os.path.dirname(__file__), "configs")
-            cfg_pose = os.path.join(cfg_dir, "mmpose_configs", param.cfg_pose)
-            ckpt_pose = param.ckpt_pose
+            cfg_pose = os.path.join(cfg_dir, "mmpose_configs", param.config)
+            ckpt_pose = param.model_url
             self.no_detector = param.detector == "None"
             self.namespace = Namespace()
 
@@ -196,8 +196,8 @@ class InferMmlabPoseEstimation(dataprocess.CKeypointDetectionTask):
                     # 23: ‘zebra’, 24: ‘giraffe’
                     self.namespace.cat_ids = [15, 16, 17, 18, 19, 20, 21, 22, 23, 24]
 
-            self.namespace.det_score_thr = param.det_thr
-            self.namespace.kpt_thr = param.kp_thr
+            self.namespace.det_score_thr = param.conf_thres
+            self.namespace.kpt_thr = param.conf_kp_thres
 
             cfg_pose = Config.fromfile(self.namespace.pose_config)
             # cfg_pose.data_cfg["image_size"] = [288, 384]

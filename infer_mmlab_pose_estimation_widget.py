@@ -77,10 +77,10 @@ class InferMmlabPoseEstimationWidget(core.CWorkflowTaskWidget):
         self.combo_config_name.currentTextChanged.connect(self.on_config_name_changed)
         self.combo_body_part.setCurrentText(self.parameters.body_part)
         self.on_body_part_changed("")
-        self.spin_det_thr = pyqtutils.append_double_spin(self.gridLayout, "Detection threshold", self.parameters.det_thr
+        self.spin_det_thr = pyqtutils.append_double_spin(self.gridLayout, "Detection threshold", self.parameters.conf_thres
                                                          , min=0, max=1, step=0.01, decimals=2)
         self.spin_kp_thr = pyqtutils.append_double_spin(self.gridLayout, "Keypoint threshold",
-                                                        self.parameters.kp_thr, min=0, max=1, step=0.01, decimals=2)
+                                                        self.parameters.conf_kp_thres, min=0, max=1, step=0.01, decimals=2)
 
         # PyQt -> Qt wrapping
         layout_ptr = qtconversion.PyQtToQt(self.gridLayout)
@@ -230,10 +230,10 @@ class InferMmlabPoseEstimationWidget(core.CWorkflowTaskWidget):
         self.parameters.dataset = self.combo_dataset.currentText()
         self.parameters.model_name = self.combo_model_name.currentText()
         self.parameters.config_name = self.combo_config_name.currentText()
-        self.parameters.det_thr = self.spin_det_thr.value()
-        self.parameters.kp_thr = self.spin_kp_thr.value()
-        self.parameters.ckpt_pose = self.ckpt
-        self.parameters.cfg_pose = self.cfg
+        self.parameters.conf_thres = self.spin_det_thr.value()
+        self.parameters.conf_kp_thres = self.spin_kp_thr.value()
+        self.parameters.model_url = self.ckpt
+        self.parameters.config = self.cfg
         self.parameters.detector = self.combo_detector.currentText()
         # Send signal to launch the process
         self.emit_apply(self.parameters)
