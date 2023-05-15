@@ -23,7 +23,6 @@ import copy
 from distutils.util import strtobool
 from mmengine import Config
 
-from mmdet.utils import register_all_modules
 from mmpose.apis import init_model as init_pose_estimator
 from mmpose.apis import inference_topdown
 from mmpose.apis.inference import dataset_meta_from_config
