@@ -8,6 +8,6 @@ git+https://github.com/cocodataset/panopticapi.git
 
 --find-links https://download.openmmlab.com/mmcv/dist/cu111/torch1.9.0/index.html
 mmcv==2.0.0; python_version < "3.10"
-mmdet==3.0.0; python_version < "3.10"
-mmengine==0.7.1; python_version < "3.10"
-mmpose==1.0.0; python_version < "3.10"
+mmdet==3.0.0
+mmengine==0.7.1
+mmpose==1.0.0
