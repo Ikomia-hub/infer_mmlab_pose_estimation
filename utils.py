@@ -1,14 +1,13 @@
 import numpy as np
 
-det_model_zoo = {"hand": {"cfg": "mmdet_configs/hand/cascade_rcnn_x101_64x4d_fpn_1class.py",
-                          "ckpt": "https://download.openmmlab.com/mmpose/mmdet_pretrained/cascade_rcnn_x101_64x4d_fpn_20e_onehand10k-dac19597_20201030.pth"},
-                 "coco": {"cfg": "mmdet_configs/coco/ssdlite_mobilenetv2_scratch_600e_coco.py",
-                          "ckpt": "https://download.openmmlab.com/mmdetection/v2.0/ssd/ssdlite_mobilenetv2_scratch_600e_coco/ssdlite_mobilenetv2_scratch_600e_coco_20210629_110627-974d9307.pth"}
+det_model_zoo = {"Hand": "cascade_rcnn_x101_64x4d_fpn_1class.py",
+                 "Person": "ssdlite_mobilenetv2-scratch_8xb24-600e_coco.py",
+                 "Face": "yolox-s_8xb8-300e_coco-face.py"
                  }
 
 
 def are_params_valid(params):
-    for p in [params.body_part, params.task, params.method, params.dataset, params.model_name, params.config_name]:
+    for p in [params.body_part, params.method, params.dataset, params.model_name, params.config_name]:
         if p == "":
             return False
     return True
@@ -23,6 +22,7 @@ def process_mmdet_results(mmdet_results, class_names=None, cat_ids=1):
     Returns:
         List[Dict]: detection results for mmpose input
     """
+    print(mmdet_results)
     if isinstance(mmdet_results, tuple):
         mmdet_results = mmdet_results[0]
 

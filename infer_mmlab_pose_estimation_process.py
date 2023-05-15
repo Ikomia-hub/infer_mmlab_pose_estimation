@@ -20,16 +20,29 @@ import os.path
 from ikomia import core, dataprocess
 import copy
 # Your imports below
-from argparse import Namespace
 from distutils.util import strtobool
-from mmcv import Config
+from mmengine import Config
 
-from mmpose.apis import inference_top_down_pose_model, init_pose_model, inference_bottom_up_pose_model
+from mmdet.utils import register_all_modules
+from mmpose.apis import init_model as init_pose_estimator
+from mmpose.apis import inference_topdown
+from mmpose.apis.inference import dataset_meta_from_config
 from mmdet.apis import inference_detector, init_detector
+from mmpose.evaluation.functional import nms
+from mmengine import DefaultScope
+import datetime
+
 from infer_mmlab_pose_estimation.utils import process_mmdet_results, det_model_zoo, are_params_valid
 import numpy as np
-from mmpose.datasets.dataset_info import DatasetInfo
 
+
+def logical_or(arrays):
+    if len(arrays) == 2:
+        return np.logical_or(*arrays)
+    elif len(arrays) == 1:
+        return arrays[0]
+    else:
+        return np.logical_or(arrays[0], logical_or(arrays[1:]))
 
 # --------------------
 # - Class to handle the process parameters
@@ -43,17 +56,22 @@ class InferMmlabPoseEstimationParam(core.CWorkflowTaskParam):
         # Example : self.windowSize = 25
         self.cuda = True
         self.update = False
-        self.body_part = "body"
-        self.task = "2d_kpt_sview_rgb_img"
+        # Parameters only used in widget
+        self.body_part = "body_2d_keypoint"
         self.method = "topdown_heatmap"
         self.dataset = "coco"
         self.model_name = "vipnas_coco"
-        self.config_name = "topdown_heatmap_vipnas_res50_coco_256x192"
+        self.config_name = "td-hm_vipnas-res50_8xb64-210e_coco-256x192"
+
+        self.custom_config_file = ""
+        self.custom_model_weight_file = ""
         self.conf_thres = 0.5
         self.conf_kp_thres = 0.3
-        self.config = "body/2d_kpt_sview_rgb_img/topdown_heatmap/coco/vipnas_res50_coco_256x192.py"
-        self.model_url = "https://download.openmmlab.com/mmpose/top_down/vipnas/vipnas_res50_coco_256x192-cc43b466_20210624.pth"
-        self.detector = "coco"
+        self.config_file = os.path.join(os.path.dirname(__file__), "configs", "body_2d_keypoint", "topdown_heatmap",
+                                        "coco", "td-hm_vipnas-res50_8xb64-210e_coco-256x192.py")
+        self.model_weight_file = "https://download.openmmlab.com/mmpose/top_down/vipnas/" \
+                                 "vipnas_res50_coco_256x192-cc43b466_20210624.pth"
+        self.detector = "Person"
 
     def set_values(self, param_map):
         # Set parameters values from Ikomia application
@@ -61,15 +79,17 @@ class InferMmlabPoseEstimationParam(core.CWorkflowTaskParam):
         # Example : self.windowSize = int(param_map["windowSize"])
         self.cuda = strtobool(param_map["cuda"])
         self.body_part = param_map["body_part"]
-        self.task = param_map["task"]
         self.method = param_map["method"]
         self.dataset = param_map["dataset"]
         self.model_name = param_map["model_name"]
         self.config_name = param_map["config_name"]
+
+        self.custom_config_file = param_map["custom_config_file"]
+        self.custom_model_weight_file = param_map["custom_model_weight_file"]
         self.conf_thres = float(param_map["conf_thres"])
         self.conf_kp_thres = float(param_map["conf_kp_thres"])
-        self.model_url = param_map["model_url"]
-        self.config = param_map["config"]
+        self.model_weight_file = param_map["model_weight_file"]
+        self.config_file = param_map["config_file"]
         self.detector = param_map["detector"]
 
     def get_values(self):
@@ -80,14 +100,16 @@ class InferMmlabPoseEstimationParam(core.CWorkflowTaskParam):
         param_map["cuda"] = str(self.cuda)
         param_map["model_name"] = self.model_name
         param_map["body_part"] = self.body_part
-        param_map["task"] = self.task
         param_map["method"] = self.method
         param_map["dataset"] = self.dataset
         param_map["config_name"] = self.config_name
+
+        param_map["custom_config_file"] = self.custom_config_file
+        param_map["custom_model_weight_file"] = self.custom_model_weight_file
         param_map["conf_thres"] = str(self.conf_thres)
         param_map["conf_kp_thres"] = str(self.conf_kp_thres)
-        param_map["model_url"] = self.model_url
-        param_map["config"] = self.config
+        param_map["model_weight_file"] = self.model_weight_file
+        param_map["config_file"] = self.config_file
         param_map["detector"] = self.detector
         return param_map
 
@@ -101,9 +123,11 @@ class InferMmlabPoseEstimation(dataprocess.CKeypointDetectionTask):
     def __init__(self, name, param):
         dataprocess.CKeypointDetectionTask.__init__(self, name)
 
+        self.remove_input(1)
+        self.add_input(dataprocess.CObjectDetectionIO())
+        self.cat_ids = None
         self.det_model = None
         self.pose_model = None
-        self.namespace = None
         # Create parameters class
         if param is None:
             self.set_param_object(InferMmlabPoseEstimationParam())
@@ -119,24 +143,23 @@ class InferMmlabPoseEstimation(dataprocess.CKeypointDetectionTask):
                         result,
                         w,
                         h,
+                        det_scores,
+                        labels,
                         kpt_score_thr=0.3):
-
         obj_id = 0
-        for item in result:
-            keypoints = item["keypoints"]
-            if 'bbox' in item:
-                x, y, x2, y2 = item["bbox"][:4]
-                if len(item["bbox"]) == 5:
-                    conf = item["bbox"][-1]
-                else:
-                    conf = 0.
+
+        for obj, det_score, label in zip(result, det_scores, labels):
+            item = obj.pred_instances
+            keypoints = item["keypoints"][0]
+            keypoint_scores = item["keypoint_scores"][0]
+            if 'bboxes' in item:
+                x, y, x2, y2 = item["bboxes"][0]
                 w, h = x2 - x, y2 - y
             else:
                 x, y = 0, 0
-
             valid = [False] * len(keypoints)
 
-            for i, (x_kp, y_kp, score) in enumerate(keypoints):
+            for i, score in enumerate(keypoint_scores):
                 if score > kpt_score_thr:
                     valid[i] = True
 
@@ -152,8 +175,67 @@ class InferMmlabPoseEstimation(dataprocess.CKeypointDetectionTask):
                 if valid[idx1] and valid[idx2]:
                     keypts.append((idx1, pt1))
                     keypts.append((idx2, pt2))
-            self.add_object(obj_id, 0, float(conf), float(x), float(y), float(w), float(h), keypts)
+            self.add_object(obj_id, 0, float(det_score), float(x), float(y), float(w), float(h), keypts)
             obj_id += 1
+
+    def load_models(self):
+        param = self.get_param_object()
+
+        cfg_pose = param.config_file
+        ckpt_pose = param.model_weight_file
+
+        self.device = "cuda" if param.cuda else 'cpu'
+
+        if param.detector != "None":
+            cfg_det = os.path.join(os.path.dirname(__file__), "mmdetection_cfg", det_model_zoo[param.detector])
+            ckpt_det = Config.fromfile(cfg_det).load_from
+            self.det_config = cfg_det
+            self.det_checkpoint = ckpt_det
+            self.det_model = init_detector(self.det_config, self.det_checkpoint,
+                                           device=self.device.lower())
+
+        if param.detector == "Person" :
+            self.cat_ids = [0]
+        elif param.detector in ["Hand", "Face"]:
+            self.cat_ids = [0]
+        else:
+            self.cat_ids = []
+
+        self.det_score_thr = param.conf_thres
+        self.kpt_thr = param.conf_kp_thres
+
+        # build pose models
+        self.pose_model = init_pose_estimator(cfg_pose, ckpt_pose,
+                                                  device=self.device.lower())
+        dataset_info = dataset_meta_from_config(Config.fromfile(cfg_pose), dataset_mode = 'val')
+
+        if dataset_info is not None:
+            skeleton_link_colors = dataset_info["skeleton_link_colors"]
+
+            # Compute keypoint links
+            keypoint_links = []
+            for i, (id1, id2) in enumerate(dataset_info["skeleton_links"]):
+                link = dataprocess.CKeypointLink()
+                link.start_point_index = id1
+                link.end_point_index = id2
+
+                name1 = dataset_info["keypoint_id2name"][id1]
+                name2 = dataset_info["keypoint_id2name"][id2]
+                link.label = f"{name1} - {name2}"
+
+                link.color = [int(c) for c in skeleton_link_colors[i]]
+                keypoint_links.append(link)
+
+            self.set_keypoint_links(keypoint_links)
+
+        else:
+            raise NotImplementedError()
+
+        self.set_object_names([param.detector])
+        self.set_keypoint_names(list(dataset_info["keypoint_id2name"].values()))
+
+        param.update = False
+
 
     def run(self):
         # Core function of your process
@@ -166,86 +248,14 @@ class InferMmlabPoseEstimation(dataprocess.CKeypointDetectionTask):
         # Examples :
         # Get input :
         input = self.get_input(0)
-        graphics_input = self.get_input(1)
+        detect_input = self.get_input(1)
 
         if (self.pose_model is None or param.update) and are_params_valid(param):
-            cfg_dir = os.path.join(os.path.dirname(__file__), "configs")
-            cfg_pose = os.path.join(cfg_dir, "mmpose_configs", param.config)
-            ckpt_pose = param.model_url
-            self.no_detector = param.detector == "None"
-            self.namespace = Namespace()
+            self.load_models()
 
-            if not self.no_detector:
-                cfg_det = os.path.join(cfg_dir, det_model_zoo[param.detector]["cfg"])
-                ckpt_det = det_model_zoo[param.detector]["ckpt"]
-                self.namespace.det_config = cfg_det
-                self.namespace.det_checkpoint = ckpt_det
-
-            self.namespace.device = "cuda" if param.cuda else 'cpu'
-            self.namespace.enable_animal_pose = False
-            self.namespace.enable_human_pose = True
-
-            self.namespace.pose_config = cfg_pose
-            self.namespace.pose_checkpoint = ckpt_pose
-
-            if not self.no_detector:
-                if param.body_part in ['body', 'face', 'wholebody', 'hand']:
-                    self.namespace.cat_ids = [1]
-                elif param.body_part in ['animal']:
-                    # 15: ‘bird’, 16: ‘cat’, 17: ‘dog’, 18: ‘horse’, 19: ‘sheep’, 20: ‘cow’, 21: ‘elephant’, 22: ‘bear’,
-                    # 23: ‘zebra’, 24: ‘giraffe’
-                    self.namespace.cat_ids = [15, 16, 17, 18, 19, 20, 21, 22, 23, 24]
-
-            self.namespace.det_score_thr = param.conf_thres
-            self.namespace.kpt_thr = param.conf_kp_thres
-
-            cfg_pose = Config.fromfile(self.namespace.pose_config)
-            # cfg_pose.data_cfg["image_size"] = [288, 384]
-            # build detection model
-            if not self.no_detector:
-                self.det_model = init_detector(self.namespace.det_config, self.namespace.det_checkpoint,
-                                               device=self.namespace.device.lower())
-
-            # build pose models
-            if self.namespace.enable_human_pose:
-                self.pose_model = init_pose_model(
-                    cfg_pose,
-                    self.namespace.pose_checkpoint,
-                    device=self.namespace.device.lower())
-
-            dataset_info = None
-            # get dataset info
-            if hasattr(self.pose_model, 'cfg') and ('dataset_info' in self.pose_model.cfg):
-                dataset_info = DatasetInfo(self.pose_model.cfg.dataset_info)
-
-            if dataset_info is not None:
-                skeleton = dataset_info.skeleton
-                pose_kpt_color = dataset_info.pose_kpt_color
-                pose_link_color = dataset_info.pose_link_color
-
-                # Compute keypoint links
-                keypoint_links = []
-                for i ,(id1, id2) in enumerate(dataset_info.skeleton):
-                    link = dataprocess.CKeypointLink()
-                    link.start_point_index = id1
-                    link.end_point_index = id2
-
-                    name1 = dataset_info.keypoint_id2name[id1]
-                    name2 = dataset_info.keypoint_id2name[id2]
-                    link.label = f"{name1} - {name2}"
-
-                    link.color = [int(c) for c in pose_link_color[i]]
-                    keypoint_links.append(link)
-
-                self.set_keypoint_links(keypoint_links)
-
-            else:
-                NotImplementedError()
-
-            self.set_object_names(["person"])
-            self.set_keypoint_names(list(dataset_info.keypoint_id2name.values()))
-
-            param.update = False
+        # to avoid registry error when running detection model
+        # not using register_mmdet_modules because too many warnings
+        DefaultScope.get_instance(f'mmdet-{datetime.datetime.now()}', scope_name='mmdet')
 
         if self.pose_model is None:
             print("Could not create model with chosen parameters")
@@ -255,53 +265,47 @@ class InferMmlabPoseEstimation(dataprocess.CKeypointDetectionTask):
             self.end_task_run()
             return
 
+
         if input.is_data_available():
             # Get image from input/output (numpy array):
             srcImage = input.get_image()
 
-            if self.no_detector:
-                det_results = []
-                if graphics_input.is_data_available():
-                    for item in graphics_input.get_items():
-                        bbox = None
-                        if isinstance(item, (core.CGraphicsRectangle, core.CGraphicsEllipse)):
-                            h, w, x, y = item.height, item.width, item.x, item.y
-                            bbox = [x, y, x + w, y + h]
-                        elif isinstance(item, core.CGraphicsPolygon):
-                            pts = item.points
-                            pts = np.array([[pt.x, pt.y] for pt in pts])
-                            bbox = [min(pts[:, 0]), min(pts[:, 1]), max(pts[:, 0]), max(pts[:, 1])]
-                        if bbox is not None:
-                            det_results.append({'bbox': bbox, 'label': item.get_category()})
-                det_results = det_results if len(det_results) else None
-                self.namespace.det_score_thr = None
+            if param.detector == "None":
+                bboxes = []
+                labels = []
+                det_scores = []
+                for idx, obj in enumerate(detect_input.get_objects()):
+                    conf = obj.confidence
+                    x, y, w, h = obj.box
+                    box = [x, y, x + w, y + h]
+                    label = obj.label
+                    bboxes.append(box)
+                    labels.append(label)
+                    det_scores.append(conf)
+
             else:
-                mmdet_results = inference_detector(self.det_model, srcImage)
-                det_results = process_mmdet_results(mmdet_results, class_names=self.det_model.CLASSES,
-                                                    cat_ids=self.namespace.cat_ids)
+                pred_instance = inference_detector(self.det_model, srcImage).pred_instances.detach().cpu().numpy()
+                bboxes = np.concatenate(
+                    (pred_instance.bboxes, pred_instance.labels[:, None], pred_instance.scores[:, None]), axis=1)
+                bboxes = bboxes[np.logical_and(
+                    logical_or([pred_instance.labels == i for i in self.cat_ids]),
+                    pred_instance.scores > self.det_score_thr)]
+                bboxes = bboxes[nms(bboxes, self.det_score_thr)]
+                bboxes, labels, det_scores = bboxes[:, :4], bboxes[:, 4], bboxes[:, 5]
 
             # inference pose model
-            if param.method in ['topdown_heatmap', 'deeppose']:
-                pose_results, _ = inference_top_down_pose_model(
-                    self.pose_model,
-                    srcImage,
-                    det_results,
-                    bbox_thr=self.namespace.det_score_thr,
-                    format='xyxy')
-            elif param.method == 'associative_embedding':
-                pose_results, _ = inference_bottom_up_pose_model(
-                    self.pose_model,
-                    srcImage,
-                    det_results,
-                    pose_nms_thr=0.9)
-            else:
-                raise Exception("Method {} doesn't exist. Choose one of 'topdown_heatmap', 'deeppose' or 'associative_embedding".format(param.method))
+            pose_results = inference_topdown(
+                self.pose_model,
+                srcImage,
+                bboxes,
+                bbox_format= 'xyxy')
 
-            bbox_color = (148, 139, 255)
             self.vis_pose_result(
                 pose_results,
                 *np.shape(srcImage)[:2],
-                kpt_score_thr=self.namespace.kpt_thr)
+                det_scores,
+                labels,
+                kpt_score_thr=self.kpt_thr)
 
         else:
             print("Run the workflow with an image")
@@ -330,7 +334,7 @@ class InferMmlabPoseEstimationFactory(dataprocess.CTaskFactory):
         self.info.description = "Inference for pose estimation models from mmpose"
         # relative path -> as displayed in Ikomia application process tree
         self.info.path = "Plugins/Python/Pose"
-        self.info.version = "1.0.0"
+        self.info.version = "2.0.0"
         self.info.icon_path = "icons/mmpose-logo.png"
         self.info.authors = "MMPose contributors"
         self.info.article = "OpenMMLab Pose Estimation Toolbox and Benchmark"
