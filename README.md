@@ -19,10 +19,9 @@
     </a> 
 </p>
 
-Inference for pose estimation models from mmpose
+Inference for pose estimation models from mmpose.
 
-[Insert illustrative image here. Image must be accessible publicly, in algorithm Github repository for example.
-<img src="images/illustration.png"  alt="Illustrative image" width="30%" height="30%">]
+![basket mmpose kp](https://raw.githubusercontent.com/Ikomia-hub/infer_mmlab_pose_estimation/main/icons/output.jpg)
 
 ## :rocket: Use with Ikomia API
 
@@ -39,17 +38,16 @@ pip install ikomia
 [Change the sample image URL to fit algorithm purpose]
 
 ```python
-import ikomia
 from ikomia.dataprocess.workflow import Workflow
+from ikomia.utils.displayIO import display
 
-# Init your workflow
 wf = Workflow()
 
-# Add algorithm
-algo = wf.add_task(name="infer_mmlab_pose_estimation", auto_connect=True)
+algo = wf.add_task(name = 'infer_mmlab_pose_estimation', auto_connect=True)
 
-# Run on your image  
-wf.run_on(url="example_image.png")
+wf.run_on(url="https://cdn.nba.com/teams/legacy/www.nba.com/bulls/sites/bulls/files/jordan_vs_indiana.jpg")
+
+display(algo.get_image_with_graphics())
 ```
 
 ## :sunny: Use with Ikomia Studio
@@ -62,9 +60,12 @@ Ikomia Studio offers a friendly UI with the same features as the API.
 
 ## :pencil: Set algorithm parameters
 
-[Explain each algorithm parameters]
+- **model_weight_file** (str): Path or URL to model weights file .pth. 
+- **config_file** (str): Path to the .py config file.
+- **conf_thres** (float) default '0.5': Threshold of Non Maximum Suppression. It will retain Object Keypoint Similarity overlap when inferior to ‘conf_thres’, [0,1].
+- **conf_kp_thres** (float) default '0.3': Threshold of the keypoint visibility. It will calculate Object Keypoint Similarity based on those keypoints whose visibility higher than ‘conf_kp_thres’, [0,1].
+- **detector**: object detector, ‘Person’, ‘Hand’, Face’. 
 
-[Change the sample image URL to fit algorithm purpose]
 
 ```python
 import ikomia
@@ -77,13 +78,17 @@ wf = Workflow()
 algo = wf.add_task(name="infer_mmlab_pose_estimation", auto_connect=True)
 
 algo.set_parameters({
-    "param1": "value1",
-    "param2": "value2",
-    ...
+    "config_file": "path/to/td-hm_vipnas-mbv3_8xb64-210e_coco-256x192.py",
+    "model_weight_file": 'https://download.openmmlab.com/mmpose/v1/body_2d_keypoint/topdown_heatmap/coco/td-hm_vipnas-mbv3_8xb64-210e_coco-256x192-e0987441_20221010.pth',
+    "conf_thres": "0.5",
+    "conf_kp_thres": "0.3",
+    "detector": "Person",
 })
 
 # Run on your image  
-wf.run_on(url="example_image.png")
+wf.run_on(url="https://cdn.nba.com/teams/legacy/www.nba.com/bulls/sites/bulls/files/jordan_vs_indiana.jpg")
+
+display(algo.get_image_with_graphics())
 
 ```
 
@@ -102,16 +107,14 @@ wf = Workflow()
 algo = wf.add_task(name="infer_mmlab_pose_estimation", auto_connect=True)
 
 # Run on your image  
-wf.run_on(url="example_image.png")
+wf.run_on(url="https://cdn.nba.com/teams/legacy/www.nba.com/bulls/sites/bulls/files/jordan_vs_indiana.jpg")
 
 # Iterate over outputs
-for output in algo.get_outputs()
+for output in algo.get_outputs():
     # Print information
     print(output)
     # Export it to JSON
     output.to_json()
 ```
 
-## :fast_forward: Advanced usage 
 
-[optional]
