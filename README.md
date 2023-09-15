@@ -21,7 +21,7 @@
 
 Inference for pose estimation models from mmpose.
 
-![basket mmpose kp](https://raw.githubusercontent.com/Ikomia-hub/infer_mmlab_pose_estimation/main/icons/output.jpg)
+![basket mmpose kp](https://raw.githubusercontent.com/Ikomia-hub/infer_mmlab_pose_estimation/feat/new_readme/icons/output.jpg)
 
 ## :rocket: Use with Ikomia API
 
@@ -34,8 +34,6 @@ pip install ikomia
 ```
 
 #### 2. Create your workflow
-
-[Change the sample image URL to fit algorithm purpose]
 
 ```python
 from ikomia.dataprocess.workflow import Workflow
