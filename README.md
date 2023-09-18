@@ -58,15 +58,14 @@ Ikomia Studio offers a friendly UI with the same features as the API.
 
 ## :pencil: Set algorithm parameters
 
-- **model_weight_file** (str): Path or URL to model weights file .pth. 
 - **config_file** (str): Path to the .py config file.
+- **model_weight_file** (str): Path or URL to model weights file .pth. Optional if config_file come from method get_model_zoo (see below for more information).
 - **conf_thres** (float) default '0.5': Threshold of Non Maximum Suppression. It will retain Object Keypoint Similarity overlap when inferior to ‘conf_thres’, [0,1].
 - **conf_kp_thres** (float) default '0.3': Threshold of the keypoint visibility. It will calculate Object Keypoint Similarity based on those keypoints whose visibility higher than ‘conf_kp_thres’, [0,1].
 - **detector**: object detector, ‘Person’, ‘Hand’, Face’. 
 
 
 ```python
-import ikomia
 from ikomia.dataprocess.workflow import Workflow
 
 # Init your workflow
@@ -76,8 +75,7 @@ wf = Workflow()
 algo = wf.add_task(name="infer_mmlab_pose_estimation", auto_connect=True)
 
 algo.set_parameters({
-    "config_file": "path/to/td-hm_vipnas-mbv3_8xb64-210e_coco-256x192.py",
-    "model_weight_file": 'https://download.openmmlab.com/mmpose/v1/body_2d_keypoint/topdown_heatmap/coco/td-hm_vipnas-mbv3_8xb64-210e_coco-256x192-e0987441_20221010.pth',
+    "config_file": "configs/body_2d_keypoint/topdown_heatmap/coco/td-hm_vipnas-mbv3_8xb64-210e_coco-256x192.py",
     "conf_thres": "0.5",
     "conf_kp_thres": "0.3",
     "detector": "Person",
@@ -90,12 +88,28 @@ display(algo.get_image_with_graphics())
 
 ```
 
+You can get the full list of available **config_file** by running this code snippet:
+```python
+from ikomia.dataprocess.workflow import Workflow
+
+# Init your workflow
+wf = Workflow()
+
+# Add algorithm
+algo = wf.add_task(name="infer_mmlab_pose_estimation", auto_connect=True)
+
+# Get pretrained models
+model_zoo = algo.get_model_zoo()
+
+# Print possibilities
+for parameters in model_zoo:
+    print(parameters)
+```
 ## :mag: Explore algorithm outputs
 
 Every algorithm produces specific outputs, yet they can be explored them the same way using the Ikomia API. For a more in-depth understanding of managing algorithm outputs, please refer to the [documentation](https://ikomia-dev.github.io/python-api-documentation/advanced_guide/IO_management.html).
 
 ```python
-import ikomia
 from ikomia.dataprocess.workflow import Workflow
 
 # Init your workflow
