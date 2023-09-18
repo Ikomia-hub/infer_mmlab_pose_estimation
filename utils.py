@@ -1,17 +1,21 @@
 import numpy as np
+from mmengine import Config
 
 det_model_zoo = {"Hand": "cascade_rcnn_x101_64x4d_fpn_1class.py",
                  "Person": "ssdlite_mobilenetv2-scratch_8xb24-600e_coco.py",
                  "Face": "yolox-s_8xb8-300e_coco-face.py"
                  }
 
-
-def are_params_valid(params):
-    for p in [params.body_part, params.method, params.dataset, params.model_name, params.config_name]:
-        if p == "":
-            return False
-    return True
-
+def dict_replace(obj, old, new):
+    if isinstance(obj, list):
+        for elt in obj:
+            dict_replace(elt, old, new)
+    if isinstance(obj, (dict, Config)):
+        for k, elt in obj.items():
+            if elt == old:
+                obj[k] = new
+            else:
+                dict_replace(elt, old, new)
 
 def process_mmdet_results(mmdet_results, class_names=None, cat_ids=1):
     """Process mmdet results to mmpose input format.
