@@ -31,8 +31,11 @@ from mmpose.evaluation.functional import nms
 from mmengine import DefaultScope
 import datetime
 
-from infer_mmlab_pose_estimation.utils import process_mmdet_results, det_model_zoo, are_params_valid
+from infer_mmlab_pose_estimation.utils import process_mmdet_results, det_model_zoo, dict_replace
 import numpy as np
+import yaml
+import torch
+from tempfile import NamedTemporaryFile
 
 
 def logical_or(arrays):
@@ -56,20 +59,11 @@ class InferMmlabPoseEstimationParam(core.CWorkflowTaskParam):
         self.cuda = True
         self.update = False
         # Parameters only used in widget
-        self.body_part = "body_2d_keypoint"
-        self.method = "topdown_heatmap"
-        self.dataset = "coco"
-        self.model_name = "vipnas_coco"
-        self.config_name = "td-hm_vipnas-res50_8xb64-210e_coco-256x192"
 
-        self.custom_config_file = ""
-        self.custom_model_weight_file = ""
         self.conf_thres = 0.5
         self.conf_kp_thres = 0.3
-        self.config_file = os.path.join(os.path.dirname(__file__), "configs", "body_2d_keypoint", "topdown_heatmap",
-                                        "coco", "td-hm_vipnas-res50_8xb64-210e_coco-256x192.py")
-        self.model_weight_file = "https://download.openmmlab.com/mmpose/top_down/vipnas/" \
-                                 "vipnas_res50_coco_256x192-cc43b466_20210624.pth"
+        self.config_file = "configs/body_2d_keypoint/topdown_heatmap/coco/td-hm_vipnas-mbv3_8xb64-210e_coco-256x192.py"
+        self.model_weight_file = ""
         self.detector = "Person"
 
     def set_values(self, param_map):
@@ -77,14 +71,6 @@ class InferMmlabPoseEstimationParam(core.CWorkflowTaskParam):
         # Parameters values are stored as string and accessible like a python dict
         # Example : self.windowSize = int(param_map["windowSize"])
         self.cuda = strtobool(param_map["cuda"])
-        self.body_part = param_map["body_part"]
-        self.method = param_map["method"]
-        self.dataset = param_map["dataset"]
-        self.model_name = param_map["model_name"]
-        self.config_name = param_map["config_name"]
-
-        self.custom_config_file = param_map["custom_config_file"]
-        self.custom_model_weight_file = param_map["custom_model_weight_file"]
         self.conf_thres = float(param_map["conf_thres"])
         self.conf_kp_thres = float(param_map["conf_kp_thres"])
         self.model_weight_file = param_map["model_weight_file"]
@@ -97,14 +83,6 @@ class InferMmlabPoseEstimationParam(core.CWorkflowTaskParam):
         param_map = {}
         # Example : paramMap["windowSize"] = str(self.windowSize)
         param_map["cuda"] = str(self.cuda)
-        param_map["model_name"] = self.model_name
-        param_map["body_part"] = self.body_part
-        param_map["method"] = self.method
-        param_map["dataset"] = self.dataset
-        param_map["config_name"] = self.config_name
-
-        param_map["custom_config_file"] = self.custom_config_file
-        param_map["custom_model_weight_file"] = self.custom_model_weight_file
         param_map["conf_thres"] = str(self.conf_thres)
         param_map["conf_kp_thres"] = str(self.conf_kp_thres)
         param_map["model_weight_file"] = self.model_weight_file
@@ -180,10 +158,10 @@ class InferMmlabPoseEstimation(dataprocess.CKeypointDetectionTask):
     def load_models(self):
         param = self.get_param_object()
 
-        cfg_pose = param.config_file
-        ckpt_pose = param.model_weight_file
-
         self.device = "cuda" if param.cuda else 'cpu'
+
+        old_torch_hub = torch.hub.get_dir()
+        torch.hub.set_dir(os.path.join(os.path.dirname(__file__), "models"))
 
         if param.detector != "None":
             cfg_det = os.path.join(os.path.dirname(__file__), "mmdetection_cfg", det_model_zoo[param.detector])
@@ -203,9 +181,22 @@ class InferMmlabPoseEstimation(dataprocess.CKeypointDetectionTask):
         self.det_score_thr = param.conf_thres
         self.kpt_thr = param.conf_kp_thres
 
+        cfg_pose, ckpt_pose = self.get_full_paths(param)
+
+        cfg_pose = Config.fromfile(cfg_pose)
+
+        dict_replace(cfg_pose, "SyncBN", "BN")
+
+        tmp_cfg = NamedTemporaryFile(suffix='.py')
+        cfg_pose.dump(tmp_cfg.name)
+        cfg_pose = tmp_cfg.name
+
         # build pose models
         self.pose_model = init_pose_estimator(cfg_pose, ckpt_pose,
                                                   device=self.device.lower())
+
+        torch.hub.set_dir(old_torch_hub)
+
         dataset_info = dataset_meta_from_config(Config.fromfile(cfg_pose), dataset_mode = 'val')
 
         if dataset_info is not None:
@@ -234,7 +225,69 @@ class InferMmlabPoseEstimation(dataprocess.CKeypointDetectionTask):
         self.set_keypoint_names(list(dataset_info["keypoint_id2name"].values()))
 
         param.update = False
+    @staticmethod
+    def get_model_zoo():
+        configs_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "configs")
+        available_configs = []
+        for task in os.listdir(configs_folder):
+            if task.startswith('_'):
+                continue
+            method_folder = os.path.join(configs_folder, task)
+            for method in os.listdir(method_folder):
+                if not os.path.isdir(os.path.join(method_folder, method)):
+                    continue
+                dataset_folder = os.path.join(configs_folder, task, method)
+                for dataset in os.listdir(dataset_folder):
+                    if not os.path.isdir(os.path.join(dataset_folder, dataset)):
+                        continue
+                    for yaml_file in os.listdir(os.path.join(configs_folder, task, method, dataset)):
+                        if not yaml_file.endswith('.yml'):
+                            continue
 
+                        yaml_file = os.path.join(configs_folder, task, method, dataset, yaml_file)
+                        with open(yaml_file, "r") as f:
+                            models_list = yaml.load(f, Loader=yaml.FullLoader)
+                            if 'Models' in models_list:
+                                models_list = models_list['Models']
+                            if not isinstance(models_list, list):
+                                continue
+                        for model_dict in models_list:
+                            available_configs.append({"config_file": model_dict["Config"]})
+        return available_configs
+
+    @staticmethod
+    def get_full_paths(param):
+        config = param.config_file
+
+        if os.path.isfile(config):
+            if param.model_weight_file == "":
+                print("model_weight_file is not set. Double check your parameters if it isn't intended.")
+            return param.config_file, param.model_weight_file
+
+        configs_folder = os.path.dirname(os.path.abspath(__file__))
+        arborescence = config.split('/')
+
+        if arborescence[1] == 'body':
+            arborescence.remove('body')
+        if arborescence[1] == "2d_kpt_sview_rgb_img":
+            arborescence[1] = "body_2d_keypoint"
+        yaml_folder = os.path.join(configs_folder, *arborescence[:-1])
+
+        if not os.path.isdir(yaml_folder):
+            raise Exception("Make sure the parameter config_file is correct or set both config_file and model_weight_file with absolute paths.")
+        for maybe_yaml in os.listdir(yaml_folder):
+            if maybe_yaml.endswith('.yml'):
+                yaml_file = os.path.join(yaml_folder, maybe_yaml)
+                with open(yaml_file, "r") as f:
+                    models_list = yaml.load(f, Loader=yaml.FullLoader)
+                    if 'Models' in models_list:
+                        models_list = models_list['Models']
+                    if not isinstance(models_list, list):
+                        continue
+                for model_dict in models_list:
+                    if config == model_dict["Config"]:
+                        return os.path.join(configs_folder, model_dict['Config']), model_dict['Weights']
+        raise Exception("This config_file has no pretrained weights.")
 
     def run(self):
         # Core function of your process
@@ -249,7 +302,7 @@ class InferMmlabPoseEstimation(dataprocess.CKeypointDetectionTask):
         input = self.get_input(0)
         detect_input = self.get_input(1)
 
-        if (self.pose_model is None or param.update) and are_params_valid(param):
+        if self.pose_model is None or param.update:
             self.load_models()
 
         # to avoid registry error when running detection model

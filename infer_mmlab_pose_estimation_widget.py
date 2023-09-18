@@ -80,7 +80,6 @@ class InferMmlabPoseEstimationWidget(core.CWorkflowTaskWidget):
         self.combo_dataset.currentTextChanged.connect(self.on_dataset_changed)
         self.combo_model_name.currentTextChanged.connect(self.on_model_name_changed)
         self.combo_config_name.currentTextChanged.connect(self.on_config_name_changed)
-        self.combo_body_part.setCurrentText(self.parameters.body_part)
         self.on_body_part_changed("")
         self.spin_det_thr = pyqtutils.append_double_spin(self.gridLayout, "Detection threshold", self.parameters.conf_thres
                                                          , min=0, max=1, step=0.01, decimals=2)
@@ -103,10 +102,7 @@ class InferMmlabPoseEstimationWidget(core.CWorkflowTaskWidget):
                 if os.path.isdir(dir_path):
                     self.combo_method.addItem(directory)
                     methods.append(directory)
-            if self.parameters.method in methods:
-                self.combo_method.setCurrentText(self.parameters.method)
-            else:
-                self.combo_method.setCurrentText(methods[0])
+            self.combo_method.setCurrentText(methods[0])
 
     def on_method_changed(self, s):
         if self.combo_method.currentText() != "":
@@ -119,10 +115,7 @@ class InferMmlabPoseEstimationWidget(core.CWorkflowTaskWidget):
                 if os.path.isdir(dir_path):
                     self.combo_dataset.addItem(dir)
                     datasets.append(dir)
-            if self.parameters.dataset in datasets:
-                self.combo_dataset.setCurrentText(self.parameters.dataset)
-            else:
-                self.combo_dataset.setCurrentText(datasets[0])
+            self.combo_dataset.setCurrentText(datasets[0])
 
     def on_dataset_changed(self, s):
         if self.combo_dataset.currentText() != "":
@@ -139,10 +132,7 @@ class InferMmlabPoseEstimationWidget(core.CWorkflowTaskWidget):
                     self.combo_model_name.addItem(os.path.splitext(filename)[0])
                     model_names.append(os.path.splitext(filename)[0])
             if len(model_names) > 0:
-                if self.parameters.model_name in model_names:
-                    self.combo_model_name.setCurrentText(self.parameters.model_name)
-                else:
-                    self.combo_model_name.setCurrentText(model_names[0])
+                self.combo_model_name.setCurrentText(model_names[0])
 
     def on_model_name_changed(self, s):
         self.combo_config_name.clear()
@@ -166,10 +156,7 @@ class InferMmlabPoseEstimationWidget(core.CWorkflowTaskWidget):
                 self.combo_config_name.addItem(experiment_name)
                 config_names.append(experiment_name)
 
-            if self.parameters.config_name in config_names:
-                self.combo_config_name.setCurrentText(self.parameters.config_name)
-            else:
-                self.combo_config_name.setCurrentText(list(self.available_cfg_ckpt.keys())[0])
+            self.combo_config_name.setCurrentText(list(self.available_cfg_ckpt.keys())[0])
 
     def on_config_name_changed(self, s):
         if self.combo_config_name.currentText() != "":
@@ -191,11 +178,6 @@ class InferMmlabPoseEstimationWidget(core.CWorkflowTaskWidget):
         # Example : self.parameters.windowSize = self.spinWindowSize.value()
         self.parameters.update = True
         self.parameters.cuda = self.check_cuda.isChecked()
-        self.parameters.body_part = self.combo_body_part.currentText()
-        self.parameters.method = self.combo_method.currentText()
-        self.parameters.dataset = self.combo_dataset.currentText()
-        self.parameters.model_name = self.combo_model_name.currentText()
-        self.parameters.config_name = self.combo_config_name.currentText()
         self.parameters.conf_thres = self.spin_det_thr.value()
         self.parameters.conf_kp_thres = self.spin_kp_thr.value()
         browse_config_file_value = self.browse_config_file.path
@@ -209,7 +191,6 @@ class InferMmlabPoseEstimationWidget(core.CWorkflowTaskWidget):
         else:
             self.parameters.config_file = browse_config_file_value
             self.parameters.model_weight_file = browse_model_weight_file_value
-        print(self.parameters.config_file)
         self.parameters.detector = self.combo_detector.currentText()
         # Send signal to launch the process
         self.emit_apply(self.parameters)
