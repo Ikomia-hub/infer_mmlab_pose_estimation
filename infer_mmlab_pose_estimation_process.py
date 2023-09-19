@@ -186,11 +186,12 @@ class InferMmlabPoseEstimation(dataprocess.CKeypointDetectionTask):
         cfg_pose = Config.fromfile(cfg_pose)
 
         dict_replace(cfg_pose, "SyncBN", "BN")
-
-        tmp_cfg = NamedTemporaryFile(suffix='.py')
+        
+        tmp_cfg = NamedTemporaryFile(suffix='.py', delete=False)
         cfg_pose.dump(tmp_cfg.name)
+        tmp_cfg.close()
         cfg_pose = tmp_cfg.name
-
+        
         # build pose models
         self.pose_model = init_pose_estimator(cfg_pose, ckpt_pose,
                                                   device=self.device.lower())
@@ -223,7 +224,9 @@ class InferMmlabPoseEstimation(dataprocess.CKeypointDetectionTask):
 
         self.set_object_names([param.detector])
         self.set_keypoint_names(list(dataset_info["keypoint_id2name"].values()))
-
+        
+        # Remove temp file
+        os.remove(tmp_cfg.name)
         param.update = False
     @staticmethod
     def get_model_zoo():
