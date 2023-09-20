@@ -389,7 +389,7 @@ class InferMmlabPoseEstimationFactory(dataprocess.CTaskFactory):
         self.info.description = "Inference for pose estimation models from mmpose"
         # relative path -> as displayed in Ikomia application process tree
         self.info.path = "Plugins/Python/Pose"
-        self.info.version = "2.0.0"
+        self.info.version = "3.0.0"
         self.info.icon_path = "icons/mmpose-logo.png"
         self.info.authors = "MMPose contributors"
         self.info.article = "OpenMMLab Pose Estimation Toolbox and Benchmark"
