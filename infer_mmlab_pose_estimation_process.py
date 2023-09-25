@@ -228,6 +228,7 @@ class InferMmlabPoseEstimation(dataprocess.CKeypointDetectionTask):
         # Remove temp file
         os.remove(tmp_cfg.name)
         param.update = False
+
     @staticmethod
     def get_model_zoo():
         configs_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "configs")
@@ -277,7 +278,10 @@ class InferMmlabPoseEstimation(dataprocess.CKeypointDetectionTask):
         yaml_folder = os.path.join(configs_folder, *arborescence[:-1])
 
         if not os.path.isdir(yaml_folder):
-            raise Exception("Make sure the parameter config_file is correct or set both config_file and model_weight_file with absolute paths.")
+            raise NotADirectoryError("Make sure the parameter config_file is correct or set both config_file and "
+                                     "model_weight_file with absolute paths. See https://raw.githubusercontent.com/Ikomia-hub/infer_mmlab_pose_estimation/main/README.md "
+                                     "for more information about how to use this algorithm.")
+
         for maybe_yaml in os.listdir(yaml_folder):
             if maybe_yaml.endswith('.yml'):
                 yaml_file = os.path.join(yaml_folder, maybe_yaml)
@@ -290,7 +294,7 @@ class InferMmlabPoseEstimation(dataprocess.CKeypointDetectionTask):
                 for model_dict in models_list:
                     if config == model_dict["Config"]:
                         return os.path.join(configs_folder, model_dict['Config']), model_dict['Weights']
-        raise Exception("This config_file has no pretrained weights.")
+        raise NotImplementedError("This config_file has no pretrained weights.")
 
     def run(self):
         # Core function of your process
