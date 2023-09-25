@@ -158,7 +158,7 @@ class InferMmlabPoseEstimation(dataprocess.CKeypointDetectionTask):
     def load_models(self):
         param = self.get_param_object()
 
-        self.device = "cuda" if param.cuda else 'cpu'
+        self.device = "cuda" if param.cuda and torch.cuda.is_available() else 'cpu'
 
         old_torch_hub = torch.hub.get_dir()
         torch.hub.set_dir(os.path.join(os.path.dirname(__file__), "models"))
