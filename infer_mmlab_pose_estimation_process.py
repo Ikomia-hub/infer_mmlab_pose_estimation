@@ -390,7 +390,6 @@ class InferMmlabPoseEstimationFactory(dataprocess.CTaskFactory):
         # Set process information as string here
         self.info.name = "infer_mmlab_pose_estimation"
         self.info.short_description = "Inference for pose estimation models from mmpose"
-        self.info.description = "Inference for pose estimation models from mmpose"
         # relative path -> as displayed in Ikomia application process tree
         self.info.path = "Plugins/Python/Pose"
         self.info.version = "3.0.0"
@@ -403,7 +402,8 @@ class InferMmlabPoseEstimationFactory(dataprocess.CTaskFactory):
         # URL of documentation
         self.info.documentation_link = "https://mmpose.readthedocs.io/en/v0.24.0/"
         # Code source repository
-        self.info.repository = "https://github.com/open-mmlab/mmpose"
+        self.info.repository = "https://github.com/Ikomia-hub/infer_mmlab_pose_estimation"
+        self.info.original_repository = "https://github.com/open-mmlab/mmpose"
         # Keywords used for search
         self.info.keywords = "infer, mmpose, pose, estimation, human, mmlab, hrnet, vipnas, body, hand, animal, 2D"
 
