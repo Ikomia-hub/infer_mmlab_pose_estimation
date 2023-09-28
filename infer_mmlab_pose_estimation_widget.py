@@ -183,7 +183,7 @@ class InferMmlabPoseEstimationWidget(core.CWorkflowTaskWidget):
         browse_config_file_value = self.browse_config_file.path
         browse_model_weight_file_value = self.browse_model_weight_file.path
         if browse_config_file_value == "":
-            self.parameters.config_file = os.path.join(os.path.dirname(__file__), "configs", self.cfg)
+            self.parameters.config_file = os.path.join("configs", self.cfg)
             if browse_model_weight_file_value == "":
                 self.parameters.model_weight_file = self.ckpt
             else:
