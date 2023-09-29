@@ -406,6 +406,8 @@ class InferMmlabPoseEstimationFactory(dataprocess.CTaskFactory):
         self.info.original_repository = "https://github.com/open-mmlab/mmpose"
         # Keywords used for search
         self.info.keywords = "infer, mmpose, pose, estimation, human, mmlab, hrnet, vipnas, body, hand, animal, 2D"
+        self.info.algo_type = core.AlgoType.INFER
+        self.info.algo_tasks = "KEYPOINTS_DETECTION"
 
     def create(self, param=None):
         # Create process object
