@@ -92,6 +92,7 @@ display(algo.get_image_with_graphics())
 You can get the full list of available **config_file** by running this code snippet:
 ```python
 from ikomia.dataprocess.workflow import Workflow
+from ikomia.utils.displayIO import display
 
 # Init your workflow
 wf = Workflow()
