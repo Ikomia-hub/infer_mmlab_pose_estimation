@@ -67,6 +67,7 @@ Ikomia Studio offers a friendly UI with the same features as the API.
 
 ```python
 from ikomia.dataprocess.workflow import Workflow
+from ikomia.utils.displayIO import display
 
 # Init your workflow
 wf = Workflow()
