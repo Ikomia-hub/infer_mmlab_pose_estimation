@@ -50,7 +50,8 @@ class InferMmlabPoseEstimationWidget(core.CWorkflowTaskWidget):
         self.gridLayout = QGridLayout()
         is_cuda_available = torch.cuda.is_available()
 
-        self.check_cuda = pyqtutils.append_check(self.gridLayout, "Use Cuda",
+        self.check_cuda = pyqtutils.append_check(self.gridLayout,
+                                                 "Use Cuda",
                                                  self.parameters.cuda and is_cuda_available)
         self.check_cuda.setChecked(self.parameters.cuda and is_cuda_available)
         self.check_cuda.setEnabled(is_cuda_available)
@@ -62,17 +63,22 @@ class InferMmlabPoseEstimationWidget(core.CWorkflowTaskWidget):
         self.combo_dataset = pyqtutils.append_combo(self.gridLayout, "Dataset")
         self.combo_model_name = pyqtutils.append_combo(self.gridLayout, "Model name")
         self.combo_config_name = pyqtutils.append_combo(self.gridLayout, "Config name")
+
         self.combo_detector = pyqtutils.append_combo(self.gridLayout, "Integrated detector")
         self.combo_detector.addItem("None")
+
         for det_name in det_model_zoo.keys():
             self.combo_detector.addItem(det_name)
+
         self.combo_detector.setCurrentText(self.parameters.detector)
         self.browse_model_weight_file = pyqtutils.append_browse_file(self.gridLayout, "Custom model weight file", "")
         self.browse_config_file = pyqtutils.append_browse_file(self.gridLayout, "Custom config file", "")
 
         for directory in os.listdir(self.configs_path):
             dir_path = os.path.join(self.configs_path, directory)
-            if directory != "_base_" and os.path.isdir(dir_path) and directory not in ['hand_gesture', 'hand_3d_keypoint', 'body_3d_keypoint']:
+            if (directory != "_base_" and
+                    os.path.isdir(dir_path) and
+                    directory not in ['hand_gesture', 'hand_3d_keypoint', 'body_3d_keypoint']):
                 self.combo_body_part.addItem(directory)
 
         self.combo_body_part.currentTextChanged.connect(self.on_body_part_changed)
@@ -81,10 +87,13 @@ class InferMmlabPoseEstimationWidget(core.CWorkflowTaskWidget):
         self.combo_model_name.currentTextChanged.connect(self.on_model_name_changed)
         self.combo_config_name.currentTextChanged.connect(self.on_config_name_changed)
         self.on_body_part_changed("")
-        self.spin_det_thr = pyqtutils.append_double_spin(self.gridLayout, "Detection threshold", self.parameters.conf_thres
+        self.spin_det_thr = pyqtutils.append_double_spin(self.gridLayout,
+                                                         "Detection threshold",
+                                                         self.parameters.conf_thres
                                                          , min=0, max=1, step=0.01, decimals=2)
         self.spin_kp_thr = pyqtutils.append_double_spin(self.gridLayout, "Keypoint threshold",
-                                                        self.parameters.conf_kp_thres, min=0, max=1, step=0.01, decimals=2)
+                                                        self.parameters.conf_kp_thres,
+                                                        min=0, max=1, step=0.01, decimals=2)
 
         # PyQt -> Qt wrapping
         layout_ptr = qtconversion.PyQtToQt(self.gridLayout)
@@ -97,11 +106,13 @@ class InferMmlabPoseEstimationWidget(core.CWorkflowTaskWidget):
             methods = []
             self.combo_method.clear()
             current_body_part = self.combo_body_part.currentText()
+
             for directory in os.listdir(os.path.join(self.configs_path, current_body_part)):
                 dir_path = os.path.join(self.configs_path, current_body_part, directory)
                 if os.path.isdir(dir_path):
                     self.combo_method.addItem(directory)
                     methods.append(directory)
+
             self.combo_method.setCurrentText(methods[0])
 
     def on_method_changed(self, s):
@@ -110,11 +121,13 @@ class InferMmlabPoseEstimationWidget(core.CWorkflowTaskWidget):
             self.combo_dataset.clear()
             current_body_part = self.combo_body_part.currentText()
             current_method = self.combo_method.currentText()
+
             for dir in os.listdir(os.path.join(self.configs_path, current_body_part, current_method)):
                 dir_path = os.path.join(self.configs_path, current_body_part, current_method, dir)
                 if os.path.isdir(dir_path):
                     self.combo_dataset.addItem(dir)
                     datasets.append(dir)
+
             self.combo_dataset.setCurrentText(datasets[0])
 
     def on_dataset_changed(self, s):
@@ -124,13 +137,16 @@ class InferMmlabPoseEstimationWidget(core.CWorkflowTaskWidget):
             current_body_part = self.combo_body_part.currentText()
             current_method = self.combo_method.currentText()
             current_dataset = self.combo_dataset.currentText()
-            for filename in os.listdir(os.path.join(self.configs_path, current_body_part, current_method,
+
+            for filename in os.listdir(os.path.join(self.configs_path,
+                                                    current_body_part,
+                                                    current_method,
                                                     current_dataset)):
-                dir_path = os.path.join(self.configs_path, current_body_part, current_method,
-                                        current_dataset, filename)
+                dir_path = os.path.join(self.configs_path, current_body_part, current_method, current_dataset, filename)
                 if os.path.isfile(dir_path) and filename.endswith(".yml"):
                     self.combo_model_name.addItem(os.path.splitext(filename)[0])
                     model_names.append(os.path.splitext(filename)[0])
+
             if len(model_names) > 0:
                 self.combo_model_name.setCurrentText(model_names[0])
 
@@ -145,6 +161,7 @@ class InferMmlabPoseEstimationWidget(core.CWorkflowTaskWidget):
             self.combo_config_name.show()
             yaml_file = os.path.join(self.configs_path, current_body_part, current_method,
                                      current_dataset, current_model_name + ".yml")
+
             with open(yaml_file, "r") as f:
                 models_list = yaml.load(f, Loader=yaml.FullLoader)['Models']
 
@@ -170,18 +187,16 @@ class InferMmlabPoseEstimationWidget(core.CWorkflowTaskWidget):
                                         current_dataset, selected_config)
                 self.ckpt = self.available_cfg_ckpt[current_config_name]["ckpt"]
 
-
     def on_apply(self):
         # Apply button clicked slot
-
         # Get parameters from widget
-        # Example : self.parameters.windowSize = self.spinWindowSize.value()
         self.parameters.update = True
         self.parameters.cuda = self.check_cuda.isChecked()
         self.parameters.conf_thres = self.spin_det_thr.value()
         self.parameters.conf_kp_thres = self.spin_kp_thr.value()
         browse_config_file_value = self.browse_config_file.path
         browse_model_weight_file_value = self.browse_model_weight_file.path
+
         if browse_config_file_value == "":
             self.parameters.config_file = os.path.join("configs", self.cfg)
             if browse_model_weight_file_value == "":
@@ -191,6 +206,7 @@ class InferMmlabPoseEstimationWidget(core.CWorkflowTaskWidget):
         else:
             self.parameters.config_file = browse_config_file_value
             self.parameters.model_weight_file = browse_model_weight_file_value
+
         self.parameters.detector = self.combo_detector.currentText()
         # Send signal to launch the process
         self.emit_apply(self.parameters)
