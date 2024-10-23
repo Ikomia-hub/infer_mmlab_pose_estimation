@@ -12,6 +12,15 @@ det_model_zoo = {
 }
 
 
+def logical_or(arrays: np.ndarray):
+    if len(arrays) == 2:
+        return np.logical_or(*arrays)
+    elif len(arrays) == 1:
+        return arrays[0]
+    else:
+        return np.logical_or(arrays[0], logical_or(arrays[1:]))
+
+
 def dict_replace(obj, old, new):
     if isinstance(obj, list):
         for elt in obj:
@@ -81,3 +90,81 @@ def process_mmdet_results(mmdet_results, class_names=None, cat_ids=1):
         det_results.append(det_result)
 
     return det_results
+
+
+def get_model_zoo() -> list:
+    configs_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "configs")
+    available_configs = []
+
+    for task in os.listdir(configs_folder):
+        if task.startswith('_'):
+            continue
+
+        method_folder = os.path.join(configs_folder, task)
+        for method in os.listdir(method_folder):
+            if not os.path.isdir(os.path.join(method_folder, method)):
+                continue
+
+            dataset_folder = os.path.join(configs_folder, task, method)
+            for dataset in os.listdir(dataset_folder):
+                if not os.path.isdir(os.path.join(dataset_folder, dataset)):
+                    continue
+
+                for yaml_file in os.listdir(os.path.join(configs_folder, task, method, dataset)):
+                    if not yaml_file.endswith('.yml'):
+                        continue
+
+                    yaml_file = os.path.join(configs_folder, task, method, dataset, yaml_file)
+                    with open(yaml_file, "r") as f:
+                        models_list = yaml.load(f, Loader=yaml.FullLoader)
+                        if 'Models' in models_list:
+                            models_list = models_list['Models']
+                        if not isinstance(models_list, list):
+                            continue
+
+                    for model_dict in models_list:
+                        available_configs.append({"config_file": model_dict["Config"]})
+
+    return available_configs
+
+
+def get_full_paths(param):
+    config = param.config_file
+
+    if os.path.isfile(config):
+        if param.model_weight_file == "":
+            print("model_weight_file is not set. Double check your parameters if it isn't intended.")
+        return param.config_file, param.model_weight_file
+
+    configs_folder = os.path.dirname(os.path.abspath(__file__))
+    arborescence = config.split('/')
+
+    if arborescence[1] == 'body':
+        arborescence.remove('body')
+    if arborescence[1] == "2d_kpt_sview_rgb_img":
+        arborescence[1] = "body_2d_keypoint"
+
+    yaml_folder = os.path.join(configs_folder, *arborescence[:-1])
+    if not os.path.isdir(yaml_folder):
+        raise NotADirectoryError("Make sure the parameter config_file is correct or set both config_file and "
+                                 "model_weight_file with absolute paths. "
+                                 "See https://raw.githubusercontent.com/Ikomia-hub/infer_mmlab_pose_estimation/main/README.md "
+                                 "for more information about how to use this algorithm.")
+
+    for maybe_yaml in os.listdir(yaml_folder):
+        if maybe_yaml.endswith('.yml'):
+            yaml_file = os.path.join(yaml_folder, maybe_yaml)
+            with open(yaml_file, "r") as f:
+                models_list = yaml.load(f, Loader=yaml.FullLoader)
+
+                if 'Models' in models_list:
+                    models_list = models_list['Models']
+
+                if not isinstance(models_list, list):
+                    continue
+
+            for model_dict in models_list:
+                if config == model_dict["Config"]:
+                    return os.path.join(configs_folder, model_dict['Config']), model_dict['Weights']
+
+    raise NotImplementedError("This config_file has no pretrained weights.")

@@ -15,4 +15,4 @@ pillow<=9.5.0
 mmcv==2.0.0; python_version < "3.10"
 mmengine==0.7.1; python_version < "3.10"
 mmdet==3.0.0; python_version < "3.10"
-mmpose==1.0.0; python_version < "3.10"
+mmpose==1.3.2; python_version < "3.10"

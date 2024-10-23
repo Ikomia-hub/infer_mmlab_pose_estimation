@@ -21,7 +21,7 @@ Models:
       AR: 0.758
       AR@0.5: 0.929
     Task: Body 2D Keypoint
-  Weights: https://download.openmmlab.com/mmpose/v1/body_2d_keypoint/topdown_heatmap/coco/td-hm_vipnas-mbv3_8xb64-210e_coco-256x192-e0987441_20221010.pth
+  Weights: (https://download.openmmlab.com/mmpose/v1/body_2d_keypoint/topdown_heatmap/coco/td-hm_vipnas-mbv3_8xb64-210e_coco-256x192-e0987441_20221010.pth
 - Config: configs/body_2d_keypoint/topdown_heatmap/coco/td-hm_vipnas-res50_8xb64-210e_coco-256x192.py
   In Collection: ViPNAS
   Metadata:

@@ -59,19 +59,19 @@ model = dict(
         std=[58.395, 57.12, 57.375],
         bgr_to_rgb=True),
     backbone=dict(
-        type='mmcls.VisionTransformer',
+        type='mmpretrain.VisionTransformer',
         arch='base',
         img_size=(256, 192),
         patch_size=16,
         qkv_bias=True,
         drop_path_rate=0.3,
         with_cls_token=False,
-        output_cls_token=False,
+        out_type='featmap',
         patch_cfg=dict(padding=2),
         init_cfg=dict(
             type='Pretrained',
             checkpoint='https://download.openmmlab.com/mmpose/'
-            'v1/pretrained_models/mae_pretrain_vit_base.pth'),
+            'v1/pretrained_models/mae_pretrain_vit_base_20230913.pth'),
     ),
     neck=dict(type='FeatureMapProcessor', scale_factor=4.0, apply_relu=True),
     head=dict(

@@ -19,30 +19,21 @@ import os.path
 import copy
 import datetime
 import numpy as np
-import yaml
 import torch
 from tempfile import NamedTemporaryFile
 
 from ikomia import utils, core, dataprocess
 
 from mmpose.apis import init_model as init_pose_estimator
-from mmpose.apis import inference_topdown
+from mmpose.apis import inference_topdown, inference_bottomup
 from mmpose.apis.inference import dataset_meta_from_config
 from mmdet.apis import inference_detector, init_detector
 from mmpose.evaluation.functional import nms
 from mmengine import Config
 from mmengine import DefaultScope
+from mmengine.registry import init_default_scope
 
-from infer_mmlab_pose_estimation.utils import get_detection_config, dict_replace
-
-
-def logical_or(arrays):
-    if len(arrays) == 2:
-        return np.logical_or(*arrays)
-    elif len(arrays) == 1:
-        return arrays[0]
-    else:
-        return np.logical_or(arrays[0], logical_or(arrays[1:]))
+from infer_mmlab_pose_estimation.utils import logical_or, dict_replace, get_detection_config, get_full_paths
 
 
 # --------------------
@@ -59,7 +50,7 @@ class InferMmlabPoseEstimationParam(core.CWorkflowTaskParam):
         # Parameters only used in widget
         self.conf_thres = 0.5
         self.conf_kp_thres = 0.3
-        self.config_file = "configs/body_2d_keypoint/topdown_heatmap/coco/td-hm_vipnas-mbv3_8xb64-210e_coco-256x192.py"
+        self.config_file = "configs/body_2d_keypoint/rtmo/coco/rtmo-m_16xb16-600e_coco-640x640.py"
         self.model_weight_file = ""
         self.detector = "Person"
 
@@ -104,6 +95,7 @@ class InferMmlabPoseEstimation(dataprocess.CKeypointDetectionTask):
         self.det_checkpoint = None
         self.det_score_thr = 0.5
         self.pose_model = None
+        self.pose_config_path = None
         self.kpt_thr = 0.3
         self.device = "cpu"
 
@@ -117,40 +109,6 @@ class InferMmlabPoseEstimation(dataprocess.CKeypointDetectionTask):
         # Function returning the number of progress steps for this process
         # This is handled by the main progress bar of Ikomia application
         return 1
-
-    def vis_pose_result(self, result, w, h, det_scores, labels, kpt_score_thr=0.3):
-        obj_id = 0
-        for obj, det_score, label in zip(result, det_scores, labels):
-            item = obj.pred_instances
-            keypoints = item["keypoints"][0]
-            keypoint_scores = item["keypoint_scores"][0]
-
-            if 'bboxes' in item:
-                x, y, x2, y2 = item["bboxes"][0]
-                w, h = x2 - x, y2 - y
-            else:
-                x, y = 0, 0
-
-            valid = [False] * len(keypoints)
-            for i, score in enumerate(keypoint_scores):
-                if score > kpt_score_thr:
-                    valid[i] = True
-
-            keypts = []
-            for i, ckpt in enumerate(self.get_keypoint_links()):
-                idx1 = ckpt.start_point_index
-                idx2 = ckpt.end_point_index
-                kp1 = keypoints[idx1]
-                kp2 = keypoints[idx2]
-                pt1 = dataprocess.CPointF(float(kp1[0]), float(kp1[1]))
-                pt2 = dataprocess.CPointF(float(kp2[0]), float(kp2[1]))
-
-                if valid[idx1] and valid[idx2]:
-                    keypts.append((idx1, pt1))
-                    keypts.append((idx2, pt2))
-
-            self.add_object(obj_id, 0, float(det_score), float(x), float(y), float(w), float(h), keypts)
-            obj_id += 1
 
     def load_models(self):
         param = self.get_param_object()
@@ -172,8 +130,8 @@ class InferMmlabPoseEstimation(dataprocess.CKeypointDetectionTask):
         self.det_score_thr = param.conf_thres
         self.kpt_thr = param.conf_kp_thres
 
-        cfg_pose, ckpt_pose = self.get_full_paths(param)
-        cfg_pose = Config.fromfile(cfg_pose)
+        self.pose_config_path, ckpt_pose = get_full_paths(param)
+        cfg_pose = Config.fromfile(self.pose_config_path)
         dict_replace(cfg_pose, "SyncBN", "BN")
         
         tmp_cfg = NamedTemporaryFile(suffix='.py', delete=False)
@@ -215,82 +173,6 @@ class InferMmlabPoseEstimation(dataprocess.CKeypointDetectionTask):
         os.remove(tmp_cfg.name)
         param.update = False
 
-    @staticmethod
-    def get_model_zoo():
-        configs_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "configs")
-        available_configs = []
-
-        for task in os.listdir(configs_folder):
-            if task.startswith('_'):
-                continue
-
-            method_folder = os.path.join(configs_folder, task)
-            for method in os.listdir(method_folder):
-                if not os.path.isdir(os.path.join(method_folder, method)):
-                    continue
-
-                dataset_folder = os.path.join(configs_folder, task, method)
-                for dataset in os.listdir(dataset_folder):
-                    if not os.path.isdir(os.path.join(dataset_folder, dataset)):
-                        continue
-
-                    for yaml_file in os.listdir(os.path.join(configs_folder, task, method, dataset)):
-                        if not yaml_file.endswith('.yml'):
-                            continue
-
-                        yaml_file = os.path.join(configs_folder, task, method, dataset, yaml_file)
-                        with open(yaml_file, "r") as f:
-                            models_list = yaml.load(f, Loader=yaml.FullLoader)
-                            if 'Models' in models_list:
-                                models_list = models_list['Models']
-                            if not isinstance(models_list, list):
-                                continue
-
-                        for model_dict in models_list:
-                            available_configs.append({"config_file": model_dict["Config"]})
-        return available_configs
-
-    @staticmethod
-    def get_full_paths(param):
-        config = param.config_file
-
-        if os.path.isfile(config):
-            if param.model_weight_file == "":
-                print("model_weight_file is not set. Double check your parameters if it isn't intended.")
-            return param.config_file, param.model_weight_file
-
-        configs_folder = os.path.dirname(os.path.abspath(__file__))
-        arborescence = config.split('/')
-
-        if arborescence[1] == 'body':
-            arborescence.remove('body')
-        if arborescence[1] == "2d_kpt_sview_rgb_img":
-            arborescence[1] = "body_2d_keypoint"
-
-        yaml_folder = os.path.join(configs_folder, *arborescence[:-1])
-        if not os.path.isdir(yaml_folder):
-            raise NotADirectoryError("Make sure the parameter config_file is correct or set both config_file and "
-                                     "model_weight_file with absolute paths. See https://raw.githubusercontent.com/Ikomia-hub/infer_mmlab_pose_estimation/main/README.md "
-                                     "for more information about how to use this algorithm.")
-
-        for maybe_yaml in os.listdir(yaml_folder):
-            if maybe_yaml.endswith('.yml'):
-                yaml_file = os.path.join(yaml_folder, maybe_yaml)
-                with open(yaml_file, "r") as f:
-                    models_list = yaml.load(f, Loader=yaml.FullLoader)
-
-                    if 'Models' in models_list:
-                        models_list = models_list['Models']
-
-                    if not isinstance(models_list, list):
-                        continue
-
-                for model_dict in models_list:
-                    if config == model_dict["Config"]:
-                        return os.path.join(configs_folder, model_dict['Config']), model_dict['Weights']
-
-        raise NotImplementedError("This config_file has no pretrained weights.")
-
     def run(self):
         # Core function of your process
         # Call begin_task_run for initialization
@@ -307,7 +189,7 @@ class InferMmlabPoseEstimation(dataprocess.CKeypointDetectionTask):
         if self.pose_model is None or param.update:
             self.load_models()
 
-        # to avoid registry error when running detection model
+        # To avoid registry error when running detection model
         # not using register_mmdet_modules because too many warnings
         DefaultScope.get_instance(f'mmdet-{datetime.datetime.now()}', scope_name='mmdet')
 
@@ -322,35 +204,47 @@ class InferMmlabPoseEstimation(dataprocess.CKeypointDetectionTask):
         if img_input.is_data_available():
             # Get image from input/output (numpy array):
             src_image = img_input.get_image()
-            if param.detector == "None":
-                bboxes = []
-                labels = []
-                det_scores = []
+            cfg_pose = Config.fromfile(self.pose_config_path)
 
-                for idx, obj in enumerate(detect_input.get_objects()):
-                    conf = obj.confidence
-                    x, y, w, h = obj.box
-                    box = [x, y, x + w, y + h]
-                    label = obj.label
-                    bboxes.append(box)
-                    labels.append(label)
-                    det_scores.append(conf)
+            if cfg_pose.data_mode == "topdown":
+                if param.detector == "None":
+                    bboxes = []
+                    labels = []
+                    det_scores = []
+
+                    for idx, obj in enumerate(detect_input.get_objects()):
+                        conf = obj.confidence
+                        x, y, w, h = obj.box
+                        box = [x, y, x + w, y + h]
+                        label = obj.label
+                        bboxes.append(box)
+                        labels.append(label)
+                        det_scores.append(conf)
+                else:
+                    pred_instance = inference_detector(self.det_model, src_image).pred_instances.detach().cpu().numpy()
+                    bboxes = np.concatenate(
+                        (pred_instance.bboxes, pred_instance.labels[:, None], pred_instance.scores[:, None]),
+                        axis=1
+                    )
+                    bboxes = bboxes[np.logical_and(
+                        logical_or([pred_instance.labels == i for i in self.cat_ids]),
+                        pred_instance.scores > self.det_score_thr)
+                    ]
+                    bboxes = bboxes[nms(bboxes, self.det_score_thr)]
+                    bboxes, labels, det_scores = bboxes[:, :4], bboxes[:, 4], bboxes[:, 5]
+
+                # inference pose model
+                pose_results = inference_topdown(self.pose_model, src_image, bboxes, bbox_format='xyxy')
+                self.vis_pose_result(pose_results, *np.shape(src_image)[:2], det_scores,
+                                     det_score_thr=self.det_score_thr, kpt_score_thr=self.kpt_thr)
             else:
-                pred_instance = inference_detector(self.det_model, src_image).pred_instances.detach().cpu().numpy()
-                bboxes = np.concatenate(
-                    (pred_instance.bboxes, pred_instance.labels[:, None], pred_instance.scores[:, None]),
-                    axis=1
-                )
-                bboxes = bboxes[np.logical_and(
-                    logical_or([pred_instance.labels == i for i in self.cat_ids]),
-                    pred_instance.scores > self.det_score_thr)
-                ]
-                bboxes = bboxes[nms(bboxes, self.det_score_thr)]
-                bboxes, labels, det_scores = bboxes[:, :4], bboxes[:, 4], bboxes[:, 5]
+                scope = self.pose_model.cfg.get('default_scope', 'mmpose')
+                if scope is not None:
+                    init_default_scope(scope)
 
-            # inference pose model
-            pose_results = inference_topdown(self.pose_model, src_image, bboxes, bbox_format='xyxy')
-            self.vis_pose_result(pose_results, *np.shape(src_image)[:2], det_scores, labels, kpt_score_thr=self.kpt_thr)
+                pose_results = inference_bottomup(self.pose_model, src_image)
+                self.vis_pose_result(pose_results, *np.shape(src_image)[:2],
+                                     det_score_thr=self.det_score_thr, kpt_score_thr=self.kpt_thr)
         else:
             print("Run the workflow with an image")
 
@@ -362,6 +256,47 @@ class InferMmlabPoseEstimation(dataprocess.CKeypointDetectionTask):
 
         # Call end_task_run to finalize process
         self.end_task_run()
+
+    def vis_pose_result(self, result, w, h, det_scores=None, det_score_thr=0.5, kpt_score_thr=0.3):
+        obj_id = 0
+        for obj in result:
+            item = obj.pred_instances
+            for i in range(len(item["bboxes"])):
+                if item["bbox_scores"][i] >= det_score_thr:
+                    keypoints = item["keypoints"][i]
+                    keypoint_scores = item["keypoint_scores"][i]
+
+                    if 'bboxes' in item:
+                        x, y, x2, y2 = item["bboxes"][i]
+                        w, h = x2 - x, y2 - y
+                    else:
+                        x, y = 0, 0
+
+                    valid = [False] * len(keypoints)
+                    for j, score in enumerate(keypoint_scores):
+                        if score > kpt_score_thr:
+                            valid[j] = True
+
+                    keypts = []
+                    for j, ckpt in enumerate(self.get_keypoint_links()):
+                        idx1 = ckpt.start_point_index
+                        idx2 = ckpt.end_point_index
+                        kp1 = keypoints[idx1]
+                        kp2 = keypoints[idx2]
+                        pt1 = dataprocess.CPointF(float(kp1[0]), float(kp1[1]))
+                        pt2 = dataprocess.CPointF(float(kp2[0]), float(kp2[1]))
+
+                        if valid[idx1] and valid[idx2]:
+                            keypts.append((idx1, pt1))
+                            keypts.append((idx2, pt2))
+
+                    if det_scores is None:
+                        det_score = item["bbox_scores"][i]
+                    else:
+                        det_score = det_scores[i]
+
+                    self.add_object(obj_id, 0, float(det_score), float(x), float(y), float(w), float(h), keypts)
+                    obj_id += 1
 
 
 # --------------------

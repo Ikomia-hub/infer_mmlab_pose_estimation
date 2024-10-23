@@ -16,6 +16,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import os.path
+import yaml
+import torch
 
 from ikomia import core, dataprocess
 from ikomia.utils import pyqtutils, qtconversion
@@ -24,8 +26,6 @@ from infer_mmlab_pose_estimation.utils import det_model_zoo
 
 # PyQt GUI framework
 from PyQt5.QtWidgets import *
-import torch
-import yaml
 
 
 # --------------------

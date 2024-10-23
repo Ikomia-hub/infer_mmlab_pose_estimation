@@ -59,7 +59,7 @@ model = dict(
         std=[58.395, 57.12, 57.375],
         bgr_to_rgb=True),
     backbone=dict(
-        type='mmcls.VisionTransformer',
+        type='mmpretrain.VisionTransformer',
         arch={
             'embed_dims': 384,
             'num_layers': 12,
@@ -71,12 +71,12 @@ model = dict(
         qkv_bias=True,
         drop_path_rate=0.1,
         with_cls_token=False,
-        output_cls_token=False,
+        out_type='featmap',
         patch_cfg=dict(padding=2),
         init_cfg=dict(
             type='Pretrained',
             checkpoint='https://download.openmmlab.com/mmpose/'
-            'v1/pretrained_models/mae_pretrain_vit_small.pth'),
+            'v1/pretrained_models/mae_pretrain_vit_small_20230913.pth'),
     ),
     head=dict(
         type='HeatmapHead',
