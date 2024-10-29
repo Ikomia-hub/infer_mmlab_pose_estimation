@@ -137,7 +137,7 @@ def get_full_paths(param):
         return param.config_file, param.model_weight_file
 
     configs_folder = os.path.dirname(os.path.abspath(__file__))
-    arborescence = config.split('/')
+    arborescence = os.path.normpath(config).split(os.path.sep)
 
     if arborescence[1] == 'body':
         arborescence.remove('body')
@@ -164,7 +164,7 @@ def get_full_paths(param):
                     continue
 
             for model_dict in models_list:
-                if config == model_dict["Config"]:
+                if os.path.normpath(config) == os.path.normpath(model_dict["Config"]):
                     return os.path.join(configs_folder, model_dict['Config']), model_dict['Weights']
 
     raise NotImplementedError("This config_file has no pretrained weights.")
