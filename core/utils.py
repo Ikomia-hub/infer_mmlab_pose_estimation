@@ -33,8 +33,13 @@ def dict_replace(obj, old, new):
                 dict_replace(elt, old, new)
 
 
+def get_root_path():
+    current_path = Path(os.path.abspath(__file__))
+    return current_path.parent.parent
+
+
 def get_detection_config(detector_name: str) -> tuple:
-    detector_cfg_path = os.path.join(os.path.dirname(__file__), "mmdetection_cfg", det_model_zoo[detector_name])
+    detector_cfg_path = os.path.join(get_root_path(), "mmdetection_cfg", det_model_zoo[detector_name])
     detector_ckpt = None
 
     # Legacy weights
@@ -93,7 +98,7 @@ def process_mmdet_results(mmdet_results, class_names=None, cat_ids=1):
 
 
 def get_model_zoo() -> list:
-    configs_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "configs")
+    configs_folder = os.path.join(get_root_path(), "configs")
     available_configs = []
 
     for task in os.listdir(configs_folder):
@@ -136,15 +141,10 @@ def get_full_paths(param):
             print("model_weight_file is not set. Double check your parameters if it isn't intended.")
         return param.config_file, param.model_weight_file
 
-    configs_folder = os.path.dirname(os.path.abspath(__file__))
-    arborescence = os.path.normpath(config).split(os.path.sep)
+    root_folder = get_root_path()
+    files_tree = os.path.normpath(config).split(os.path.sep)
+    yaml_folder = os.path.join(root_folder, *files_tree[:-1])
 
-    if arborescence[1] == 'body':
-        arborescence.remove('body')
-    if arborescence[1] == "2d_kpt_sview_rgb_img":
-        arborescence[1] = "body_2d_keypoint"
-
-    yaml_folder = os.path.join(configs_folder, *arborescence[:-1])
     if not os.path.isdir(yaml_folder):
         raise NotADirectoryError("Make sure the parameter config_file is correct or set both config_file and "
                                  "model_weight_file with absolute paths. "
@@ -165,6 +165,33 @@ def get_full_paths(param):
 
             for model_dict in models_list:
                 if os.path.normpath(config) == os.path.normpath(model_dict["Config"]):
-                    return os.path.join(configs_folder, model_dict['Config']), model_dict['Weights']
+                    return os.path.join(root_folder, model_dict['Config']), model_dict['Weights']
 
     raise NotImplementedError("This config_file has no pretrained weights.")
+
+
+def postprocess_rtmpose3d(pose_results: list, rebase_keypts: bool = True):
+    for idx, pose_est_result in enumerate(pose_results):
+        pose_est_result.track_id = pose_results[idx].get('track_id', 1e4)
+
+        pred_instances = pose_est_result.pred_instances
+        keypoints = pred_instances.keypoints
+        keypoint_scores = pred_instances.keypoint_scores
+
+        if keypoint_scores.ndim == 3:
+            keypoint_scores = np.squeeze(keypoint_scores, axis=1)
+            pose_results[idx].pred_instances.keypoint_scores = keypoint_scores
+
+        if keypoints.ndim == 4:
+            keypoints = np.squeeze(keypoints, axis=1)
+
+        keypoints = -keypoints[..., [0, 2, 1]]
+
+        # rebase height (z-axis)
+        if rebase_keypts:
+            keypoints[..., 2] -= np.min(keypoints[..., 2], axis=-1, keepdims=True)
+
+        pose_results[idx].pred_instances.keypoints = keypoints
+
+    pose_results = sorted(pose_results, key=lambda x: x.get('track_id', 1e4))
+    return pose_results

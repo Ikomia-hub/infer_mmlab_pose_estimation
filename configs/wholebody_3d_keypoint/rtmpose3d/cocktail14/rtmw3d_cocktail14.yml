@@ -1,0 +1,19 @@
+Models:
+- Config: configs/wholebody_3d_keypoint/rtmpose3d/cocktail14/rtmw3d-l_8xb64_cocktail14-384x288.py
+  In Collection: RTMPose
+  Alias: 3d-wholebody
+  Metadata:
+    Architecture: &id001
+    - RTMPose
+    Training Data: Coktail14
+  Name: rtmw3d-l_8xb64_cocktail14-384x288
+  Weights: https://download.openmmlab.com/mmpose/v1/wholebody_3d_keypoint/rtmw3d/rtmw3d-l_8xb64_cocktail14-384x288-794dbc78_20240626.pth
+
+- Config: configs/wholebody_3d_keypoint/rtmpose3d/cocktail14/rtmw3d-x_8xb32_cocktail14-384x288.py
+  In Collection: RTMPose
+  Alias: 3d-wholebody
+  Metadata:
+    Architecture: *id001
+    Training Data: Cocktail14
+  Name: rtmw3d-x_8xb32_cocktail14-384x288
+  Weights: https://download.openmmlab.com/mmpose/v1/wholebody_3d_keypoint/rtmw3d/rtmw3d-x_8xb64_cocktail14-384x288-b0a0eab7_20240626.pth
