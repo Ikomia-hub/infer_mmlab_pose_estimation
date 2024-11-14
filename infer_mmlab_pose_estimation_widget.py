@@ -26,7 +26,7 @@ from ikomia import core, dataprocess
 from ikomia.utils import pyqtutils, qtconversion
 
 from infer_mmlab_pose_estimation.infer_mmlab_pose_estimation_process import InferMmlabPoseEstimationParam
-from infer_mmlab_pose_estimation.core.utils import det_model_zoo
+from infer_mmlab_pose_estimation.core.utils import det_model_zoo, not_implemented_methods
 
 
 # --------------------
@@ -113,7 +113,7 @@ class InferMmlabPoseEstimationWidget(core.CWorkflowTaskWidget):
         parts = []
         for directory in os.listdir(self.configs_path):
             dir_path = os.path.join(self.configs_path, directory)
-            if directory != "_base_" and os.path.isdir(dir_path):
+            if directory not in not_implemented_methods and os.path.isdir(dir_path):
                 self.combo_body_part.addItem(directory)
                 parts.append(directory)
 

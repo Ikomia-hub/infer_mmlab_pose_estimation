@@ -11,6 +11,8 @@ det_model_zoo = {
     "Face": "yolox-s_8xb8-300e_coco-face.py"
 }
 
+not_implemented_methods = ["_base_", "body_3d_keypoint"]
+
 
 def logical_or(arrays: np.ndarray):
     if len(arrays) == 2:
@@ -40,11 +42,10 @@ def get_root_path():
 
 def get_detection_config(detector_name: str) -> tuple:
     detector_cfg_path = os.path.join(get_root_path(), "mmdetection_cfg", det_model_zoo[detector_name])
-    detector_ckpt = None
 
     # Legacy weights
-    ckpt_det = Config.fromfile(detector_cfg_path).load_from
-    if ckpt_det is None:
+    detector_ckpt = Config.fromfile(detector_cfg_path).load_from
+    if detector_ckpt is None:
         yaml_file = os.path.join(Path(detector_cfg_path).parent, "metafile.yml")
         if os.path.isfile(yaml_file):
             with open(yaml_file, "r") as f:

@@ -180,19 +180,25 @@ class InferMmlabPoseEstimation(dataprocess.CKeypointDetectionTask):
                         valid[j] = True
 
                 keypts = []
-                for j, ckpt in enumerate(self.get_keypoint_links()):
-                    idx1 = ckpt.start_point_index
-                    idx2 = ckpt.end_point_index
-                    kp1 = keypoints[idx1]
-                    kp2 = keypoints[idx2]
-                    pt1 = dataprocess.CPointF(*map(float, kp1))
-                    pt2 = dataprocess.CPointF(*map(float, kp2))
+                links = self.get_keypoint_links()
+                if len(links) > 0:
+                    for j, ckpt in enumerate(links):
+                        idx1 = ckpt.start_point_index
+                        idx2 = ckpt.end_point_index
+                        kp1 = keypoints[idx1]
+                        kp2 = keypoints[idx2]
+                        pt1 = dataprocess.CPointF(*map(float, kp1))
+                        pt2 = dataprocess.CPointF(*map(float, kp2))
 
-                    if valid[idx1] and valid[idx2]:
-                        keypts.append((idx1, pt1))
-                        keypts.append((idx2, pt2))
+                        if valid[idx1] and valid[idx2]:
+                            keypts.append((idx1, pt1))
+                            keypts.append((idx2, pt2))
+                else:
+                    for j, kpt in enumerate(keypoints):
+                        if valid[j]:
+                            keypts.append((j, dataprocess.CPointF(*map(float, keypoints[j]))))
 
-                if det_scores is None:
+                if det_scores is None or len(det_scores) == 0:
                     det_score = item["bbox_scores"][i]
                 else:
                     det_score = det_scores[i]
