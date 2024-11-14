@@ -2,7 +2,6 @@ import os
 import sys
 import torch
 import datetime
-from tempfile import NamedTemporaryFile
 import numpy as np
 
 from mmengine import Config
@@ -17,7 +16,7 @@ from mmpose.structures import merge_data_samples
 from ikomia.dataprocess import CKeypointLink
 
 from infer_mmlab_pose_estimation.core.utils import (
-    logical_or, dict_replace, get_detection_config, get_root_path, get_full_paths, postprocess_rtmpose3d
+    logical_or, get_detection_config, get_root_path, get_full_paths, postprocess_rtmpose3d
 )
 
 
@@ -63,17 +62,18 @@ class PoseInference:
 
         self.pose_config_path, ckpt_pose = get_full_paths(self.params)
         cfg_pose = Config.fromfile(self.pose_config_path)
-        dict_replace(cfg_pose, "SyncBN", "BN")
 
-        tmp_cfg = NamedTemporaryFile(suffix='.py', delete=False)
-        cfg_pose.dump(tmp_cfg.name)
-        tmp_cfg.close()
-        cfg_pose = tmp_cfg.name
+        # Patch not necessary anymore?
+        # with NamedTemporaryFile(suffix='.py', delete=True) as tmp_cfg_file:
+        #     dict_replace(cfg_pose, "SyncBN", "BN")
+        #     cfg_pose.dump(tmp_cfg_file.name)
+        #     tmp_cfg_file.close()
+        #     cfg_pose = Config.fromfile(tmp_cfg_file)
 
         # build pose models
         self.pose_model = init_model(cfg_pose, ckpt_pose, device=self.device.lower())
         torch.hub.set_dir(old_torch_hub)
-        self.dataset_info = dataset_meta_from_config(Config.fromfile(cfg_pose), dataset_mode='val')
+        self.dataset_info = dataset_meta_from_config(cfg_pose, dataset_mode='val')
 
         if self.dataset_info is not None:
             skeleton_link_colors = self.dataset_info["skeleton_link_colors"]
@@ -92,9 +92,6 @@ class PoseInference:
                 self.keypoint_links.append(link)
         else:
             raise NotImplementedError()
-
-        # Remove temp file
-        os.remove(tmp_cfg.name)
 
     def _detect_objets(self, src_image, detect_input=None) -> tuple:
         if self.params.detector == "None":

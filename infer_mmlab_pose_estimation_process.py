@@ -159,6 +159,10 @@ class InferMmlabPoseEstimation(dataprocess.CKeypointDetectionTask):
             if item["bbox_scores"][i] >= param.conf_thres:
                 if "transformed_keypoints" in item:
                     keypoints = item["transformed_keypoints"][i]
+                    keypoints_z = item["keypoints"][i][..., 2]
+                    keypoints_z = keypoints_z + result.gt_instances.root_z[i]
+                    keypoints_z = keypoints_z.reshape((len(keypoints_z), 1))
+                    keypoints = np.append(keypoints, keypoints_z, axis=1)
                 else:
                     keypoints = item["keypoints"][i]
 
@@ -181,8 +185,8 @@ class InferMmlabPoseEstimation(dataprocess.CKeypointDetectionTask):
                     idx2 = ckpt.end_point_index
                     kp1 = keypoints[idx1]
                     kp2 = keypoints[idx2]
-                    pt1 = dataprocess.CPointF(float(kp1[0]), float(kp1[1]))
-                    pt2 = dataprocess.CPointF(float(kp2[0]), float(kp2[1]))
+                    pt1 = dataprocess.CPointF(*map(float, kp1))
+                    pt2 = dataprocess.CPointF(*map(float, kp2))
 
                     if valid[idx1] and valid[idx2]:
                         keypts.append((idx1, pt1))
