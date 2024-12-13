@@ -17,6 +17,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from ikomia import dataprocess
+from infer_mmlab_pose_estimation.infer_mmlab_pose_estimation_process import InferMmlabPoseEstimationFactory
+from infer_mmlab_pose_estimation.infer_mmlab_pose_estimation_process import InferMmlabPoseEstimationParamFactory
 
 
 # --------------------
@@ -30,10 +32,12 @@ class IkomiaPlugin(dataprocess.CPluginProcessInterface):
 
     def get_process_factory(self):
         # Instantiate process object
-        from infer_mmlab_pose_estimation.infer_mmlab_pose_estimation_process import InferMmlabPoseEstimationFactory
         return InferMmlabPoseEstimationFactory()
 
     def get_widget_factory(self):
         # Instantiate associated widget object
         from infer_mmlab_pose_estimation.infer_mmlab_pose_estimation_widget import InferMmlabPoseEstimationWidgetFactory
         return InferMmlabPoseEstimationWidgetFactory()
+
+    def get_param_factory(self):
+        return InferMmlabPoseEstimationParamFactory()

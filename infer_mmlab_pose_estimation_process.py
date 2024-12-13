@@ -81,6 +81,15 @@ class InferMmlabPoseEstimationParam(core.CWorkflowTaskParam):
         return param_map
 
 
+class InferMmlabPoseEstimationParamFactory(dataprocess.CTaskParamFactory):
+    def __init__(self):
+        dataprocess.CTaskParamFactory.__init__(self)
+        self.name = "infer_mmlab_pose_estimation"
+
+    def create(self):
+        return InferMmlabPoseEstimationParam()
+
+
 # --------------------
 # - Class which implements the process
 # - Inherits PyCore.CWorkflowTask or derived from Ikomia API
@@ -223,8 +232,8 @@ class InferMmlabPoseEstimationFactory(dataprocess.CTaskFactory):
         self.info.version = "3.2.0"
         # self.info.min_python_version = "3.8.0"
         # self.info.max_python_version = "3.11.0"
-        self.info.min_ikomia_version = "0.11.1"
-        # self.info.max_ikomia_version = "0.11.0"
+        self.info.min_ikomia_version = "0.13.0"
+        # self.info.max_ikomia_version = "0.13.0"
         self.info.icon_path = "icons/mmpose-logo.png"
         self.info.authors = "MMPose contributors"
         self.info.article = "OpenMMLab Pose Estimation Toolbox and Benchmark"
