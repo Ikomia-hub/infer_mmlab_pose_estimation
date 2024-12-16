@@ -50,6 +50,13 @@ class InferMmlabPoseEstimationParam(core.CWorkflowTaskParam):
     def set_values(self, param_map):
         # Set parameters values from Ikomia application
         # Parameters values are stored as string and accessible like a python dict
+        cuda = utils.strtobool(param_map["cuda"])
+        if (self.cuda != cuda or self.body_part != param_map["body_part"] or self.method != param_map["method"] or
+                self.dataset != param_map["dataset"] or self.model_name != param_map["model_name"] or
+                self.config_name != param_map["config_name"] or self.config_file != param_map["model_weight_file"] or
+                self.model_weight_file != param_map["model_weight_file"] or self.detector != param_map["detector"]):
+            self.update = True
+
         self.cuda = utils.strtobool(param_map["cuda"])
         self.conf_thres = float(param_map["conf_thres"])
         self.conf_kp_thres = float(param_map["conf_kp_thres"])
@@ -229,7 +236,7 @@ class InferMmlabPoseEstimationFactory(dataprocess.CTaskFactory):
         self.info.short_description = "Inference for pose estimation models from mmpose"
         # relative path -> as displayed in Ikomia application process tree
         self.info.path = "Plugins/Python/Pose"
-        self.info.version = "3.2.0"
+        self.info.version = "3.2.1"
         # self.info.min_python_version = "3.8.0"
         # self.info.max_python_version = "3.11.0"
         self.info.min_ikomia_version = "0.13.0"
