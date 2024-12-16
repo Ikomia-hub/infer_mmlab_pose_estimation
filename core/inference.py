@@ -46,6 +46,7 @@ class PoseInference:
         return self.pose_model is not None
 
     def load_models(self):
+        self.device = "cuda" if self.params.cuda and torch.cuda.is_available() else 'cpu'
         old_torch_hub = torch.hub.get_dir()
         torch.hub.set_dir(os.path.join(get_root_path(), "models"))
 
