@@ -122,6 +122,22 @@ class InferMmlabPoseEstimation(dataprocess.CKeypointDetectionTask):
         # This is handled by the main progress bar of Ikomia application
         return 1
 
+    def _load_model(self):
+        param = self.get_param_object()
+        if not param.config_file:
+            param.config_file = os.path.join(
+                "configs", param.body_part, param.method, param.dataset, f"{param.config_name}.py"
+            )
+
+        self.inference.load_models()
+        self.set_keypoint_links(self.inference.keypoint_links)
+        self.set_object_names([param.detector])
+        self.set_keypoint_names(list(self.inference.dataset_info["keypoint_id2name"].values()))
+        param.update = False
+
+    def init_long_process(self):
+        self._load_model()
+
     def run(self):
         # Core function of your process
         # Call begin_task_run for initialization
@@ -134,17 +150,8 @@ class InferMmlabPoseEstimation(dataprocess.CKeypointDetectionTask):
         img_input = self.get_input(0)
         detect_input = self.get_input(1)
 
-        if not param.config_file:
-            param.config_file = os.path.join(
-                "configs", param.body_part, param.method, param.dataset, f"{param.config_name}.py"
-            )
-
-        if not self.inference.is_model_loaded() or param.update:
-            self.inference.load_models()
-            self.set_keypoint_links(self.inference.keypoint_links)
-            self.set_object_names([param.detector])
-            self.set_keypoint_names(list(self.inference.dataset_info["keypoint_id2name"].values()))
-            param.update = False
+        if param.update:
+            self._load_model()
 
         if not self.inference.is_model_loaded():
             raise RuntimeError("Could not create model with chosen parameters")
@@ -236,10 +243,10 @@ class InferMmlabPoseEstimationFactory(dataprocess.CTaskFactory):
         self.info.short_description = "Inference for pose estimation models from mmpose"
         # relative path -> as displayed in Ikomia application process tree
         self.info.path = "Plugins/Python/Pose"
-        self.info.version = "3.2.2"
-        # self.info.min_python_version = "3.8.0"
-        # self.info.max_python_version = "3.11.0"
-        self.info.min_ikomia_version = "0.13.0"
+        self.info.version = "3.3.0"
+        self.info.min_python_version = "3.9.0"
+        self.info.max_python_version = "3.11.0"
+        self.info.min_ikomia_version = "0.15.0"
         # self.info.max_ikomia_version = "0.13.0"
         self.info.icon_path = "icons/mmpose-logo.png"
         self.info.authors = "MMPose contributors"
@@ -256,6 +263,10 @@ class InferMmlabPoseEstimationFactory(dataprocess.CTaskFactory):
         self.info.keywords = "infer, mmpose, pose, estimation, human, mmlab, hrnet, vipnas, body, hand, animal, 2D"
         self.info.algo_type = core.AlgoType.INFER
         self.info.algo_tasks = "KEYPOINTS_DETECTION"
+        self.info.hardware_config.min_cpu = 4
+        self.info.hardware_config.min_ram = 16
+        self.info.hardware_config.gpu_required = False
+        self.info.hardware_config.min_vram = 6
 
     def create(self, param=None):
         # Create process object

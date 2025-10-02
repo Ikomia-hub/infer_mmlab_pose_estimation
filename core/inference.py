@@ -8,6 +8,7 @@ from mmengine import Config
 from mmengine import DefaultScope
 from mmengine.registry import init_default_scope
 from mmdet.apis import inference_detector, init_detector
+from mmdet.utils import register_all_modules
 from mmpose.apis import init_model, inference_topdown, inference_bottomup
 from mmpose.apis.inference import dataset_meta_from_config
 from mmpose.evaluation.functional import nms
@@ -22,6 +23,7 @@ from infer_mmlab_pose_estimation.core.utils import (
 
 class PoseInference:
     def __init__(self, params):
+        register_all_modules()
         self.params = params
         self.device = "cuda" if params.cuda and torch.cuda.is_available() else 'cpu'
         self.det_config = None
