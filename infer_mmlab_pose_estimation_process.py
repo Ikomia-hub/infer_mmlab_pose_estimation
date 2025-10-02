@@ -137,6 +137,7 @@ class InferMmlabPoseEstimation(dataprocess.CKeypointDetectionTask):
 
     def init_long_process(self):
         self._load_model()
+        super().init_long_process()
 
     def run(self):
         # Core function of your process
