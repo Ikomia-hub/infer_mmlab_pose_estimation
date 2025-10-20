@@ -6,4 +6,5 @@ matplotlib>=3.9.0,<4.0.0
 yapf==0.40.1
 pillow>=11.0.0, <12.0.0
 
-xtcocotools --no-binary=xtcocotools
+--no-binary=xtcocotools
+xtcocotools
