@@ -1,20 +1,3 @@
-# Copyright (C) 2021 Ikomia SAS
-# Contact: https://www.ikomia.com
-#
-# This file is part of the IkomiaStudio software.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Affero General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import os.path
 import copy
 import numpy as np
@@ -244,11 +227,10 @@ class InferMmlabPoseEstimationFactory(dataprocess.CTaskFactory):
         self.info.short_description = "Inference for pose estimation models from mmpose"
         # relative path -> as displayed in Ikomia application process tree
         self.info.path = "Plugins/Python/Pose"
-        self.info.version = "3.3.0"
-        self.info.min_python_version = "3.9.0"
+        self.info.version = "3.4.0"
+        self.info.min_python_version = "3.10.0"
         self.info.max_python_version = "3.11.0"
-        self.info.min_ikomia_version = "0.15.0"
-        # self.info.max_ikomia_version = "0.13.0"
+        self.info.min_ikomia_version = "0.16.0"
         self.info.icon_path = "icons/mmpose-logo.png"
         self.info.authors = "MMPose contributors"
         self.info.article = "OpenMMLab Pose Estimation Toolbox and Benchmark"
